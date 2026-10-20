@@ -1,0 +1,791 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Torna Ustası - Ceotherm</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            user-select: none;
+            -webkit-user-select: none;
+            touch-action: none;
+        }
+
+        body, html {
+            width: 100%;
+            height: 100dvh;
+            overflow: hidden;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #0b172a;
+            color: #fff;
+        }
+
+        /* Ana Oyun Alanı ve Arka Plan */
+        .game-container {
+            position: relative;
+            width: 100%;
+            height: 100dvh;
+            background-image: url('images/games/game3back.png');
+            background-size: 100% 100%;
+            background-position: center;
+            background-repeat: no-repeat;
+            overflow: hidden;
+            cursor: crosshair;
+        }
+
+        /* Tahta / Hedef Şekil Canvas Alanı */
+        #board-area {
+            position: absolute;
+            top: 26%;
+            left: 49%;
+            width: 50%;
+            height: 15%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 5;
+        }
+
+        #targetCanvas {
+            width: 100%;
+            height: 100%;
+            border-radius: 4px;
+        }
+
+        /* Torna İşleme ve İş Parçası Alanı */
+        #lathe-area {
+            position: absolute;
+            top: 42.5%;
+            left: 21%;
+            width: 60%;
+            height: 30%;
+            z-index: 5;
+        }
+
+        #latheCanvas {
+            width: 100%;
+            height: 100%;
+            display: block;
+        }
+
+        /* HUD & Bilgi Paneli */
+        #hud-area {
+            position: absolute;
+            top: 2%;
+            left: 2%;
+            right: 2%;
+            height: 45px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0 15px;
+            z-index: 10;
+            pointer-events: none;
+        }
+
+        .hud-card {
+            background: rgba(13, 47, 92, 0.85);
+            border: 2px solid #FF8C32;
+            border-radius: 8px;
+            padding: 4px 12px;
+            font-weight: bold;
+            font-size: 0.95rem;
+            color: #fff;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+            pointer-events: auto;
+        }
+
+        .hud-card span {
+            color: #FF8C32;
+        }
+
+        /* GERÇEKÇİ 3D ENDÜSTRİYEL ÇARK / MERDANE TASARIMI */
+        .wheel-container {
+            position: absolute;
+            bottom: 3.5%;
+            width: 115px;
+            height: 115px;
+            border-radius: 50%;
+            z-index: 2;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            pointer-events: none;
+        }
+
+        #wheelX-container { left: 4.5%; }
+        #wheelY-container { right: 4.5%; }
+
+        .handwheel {
+            width: 100%;
+            height: 100%;
+            border-radius: 50%;
+            background: conic-gradient(from 0deg, #d1d5db, #4b5563, #f3f4f6, #374151, #9ca3af, #e5e7eb, #4b5563, #d1d5db);
+            box-shadow: 0 8px 20px rgba(0,0,0,0.8), inset 0 0 8px rgba(255,255,255,0.8), 0 0 2px 2px #1f2937;
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .wheel-inner {
+            width: 78%;
+            height: 78%;
+            border-radius: 50%;
+            background: radial-gradient(circle, #2d3748 0%, #1a202c 70%, #0d1117 100%);
+            border: 3px solid #4a5568;
+            box-shadow: inset 0 4px 10px rgba(0,0,0,0.9);
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .wheel-spoke {
+            position: absolute;
+            width: 100%;
+            height: 8px;
+            background: linear-gradient(90deg, #9ca3af, #4b5563, #1f2937, #4b5563, #9ca3af);
+            border-radius: 4px;
+        }
+        .spoke-1 { transform: rotate(0deg); }
+        .spoke-2 { transform: rotate(90deg); }
+
+        .wheel-center-cap {
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            background: radial-gradient(circle, #f3f4f6 20%, #9ca3af 60%, #374151 100%);
+            border: 2px solid #111827;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.6);
+            z-index: 3;
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .wheel-center-cap::after {
+            content: '';
+            width: 10px;
+            height: 10px;
+            background: #111827;
+            clip-path: polygon(30% 0%, 70% 0%, 100% 50%, 70% 100%, 30% 100%, 0% 50%);
+        }
+
+        .wheel-handle {
+            position: absolute;
+            top: 4px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: radial-gradient(circle at 35% 35%, #ffffff, #4b5563 40%, #111827 85%);
+            border: 2px solid #000;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.7);
+            z-index: 4;
+        }
+
+        .wheel-label {
+            position: absolute;
+            bottom: -22px;
+            width: 100%;
+            text-align: center;
+            font-size: 0.75rem;
+            font-weight: bold;
+            color: #FF8C32;
+            text-shadow: 1px 1px 3px #000;
+        }
+
+        /* Menüler ve Butonlar */
+        .btn {
+            background: linear-gradient(135deg, #FF8C32, #D4650B);
+            color: #fff;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 6px;
+            font-weight: bold;
+            cursor: pointer;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+            transition: transform 0.1s;
+            pointer-events: auto;
+        }
+
+        .btn:active { transform: scale(0.95); }
+
+        .modal-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(10, 20, 35, 0.9);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 100;
+        }
+
+        .modal-card {
+            background: #0d2f5c;
+            border: 3px solid #FF8C32;
+            padding: 25px;
+            border-radius: 12px;
+            text-align: center;
+            max-width: 90%;
+            width: 360px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.8);
+        }
+
+        .modal-card h2 { color: #FF8C32; margin-bottom: 12px; font-size: 1.3rem; }
+        .modal-card p { margin-bottom: 20px; font-size: 0.95rem; line-height: 1.4; color: #cbd5e1; }
+        .hidden { display: none !important; }
+
+        /* Usta Fotoğrafı Çerçevesi */
+        .usta-foto {
+            width: 90px;
+            height: 90px;
+            border-radius: 50%;
+            border: 3px solid #FF8C32;
+            object-fit: cover;
+            margin: 0 auto 15px auto;
+            display: block;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.6);
+        }
+    </style>
+</head>
+<body>
+
+    <div class="game-container" id="gameArea">
+        <!-- HUD Paneli -->
+        <div id="hud-area">
+            <div class="hud-card">SÜRE: <span id="timeDisplay">20.0</span>s</div>
+            <div class="hud-card">HASSASİYET: <span id="accuracyDisplay">0%</span></div>
+            <button class="btn" onclick="togglePause()">DURAKLAT</button>
+        </div>
+
+        <!-- Hedef Tahta Alanı (Çizim) -->
+        <div id="board-area">
+            <canvas id="targetCanvas"></canvas>
+        </div>
+
+        <!-- Torna Tezgahı ve İş Parçası Alanı -->
+        <div id="lathe-area">
+            <canvas id="latheCanvas"></canvas>
+        </div>
+
+        <!-- X Eksen Çarkı -->
+        <div id="wheelX-container" class="wheel-container">
+            <div id="wheelX" class="handwheel">
+                <div class="wheel-inner">
+                    <div class="wheel-spoke spoke-1"></div>
+                    <div class="wheel-spoke spoke-2"></div>
+                    <div class="wheel-center-cap"></div>
+                </div>
+                <div class="wheel-handle"></div>
+            </div>
+            <div class="wheel-label">X EKSENİ</div>
+        </div>
+
+        <!-- Y Eksen Çarkı -->
+        <div id="wheelY-container" class="wheel-container">
+            <div id="wheelY" class="handwheel">
+                <div class="wheel-inner">
+                    <div class="wheel-spoke spoke-1"></div>
+                    <div class="wheel-spoke spoke-2"></div>
+                    <div class="wheel-center-cap"></div>
+                </div>
+                <div class="wheel-handle"></div>
+            </div>
+            <div class="wheel-label">Y EKSENİ</div>
+        </div>
+
+        <!-- Başlangıç Modalı -->
+        <div id="startModal" class="modal-overlay">
+            <div class="modal-card">
+                <h2>TORNA USTASI</h2>
+                <p>Ekranda herhangi bir yere dokunup sürükleyerek torna bıçağını yönlendirin.<br><br>Tahtada siyah çizgiyle gösterilen <b>kademeli mil profilini</b> 20 saniye içinde <b>alttan işleyerek</b> tamamlayın!</p>
+                <div style="display: flex; flex-direction: column; gap: 10px;">
+                    <button class="btn" onclick="startGame()">OYUNA BAŞLA</button>
+                    <button class="btn" style="background: #4a5568;" onclick="window.location.href='gamemenu.html'">ANA MENÜYE DÖN</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Duraklatma Modalı -->
+        <div id="pauseModal" class="modal-overlay hidden">
+            <div class="modal-card">
+                <h2>OYUN DURDURULDU</h2>
+                <div style="display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; margin-top: 15px;">
+                    <button class="btn" style="flex: 1;" onclick="togglePause()">DEVAM ET</button>
+                    <button class="btn" style="flex: 1; background: #e53e3e;" onclick="resetGame()">YENİDEN BAŞLA</button>
+                    <button class="btn" style="width: 100%; background: #4a5568;" onclick="window.location.href='gamemenu.html'">ANA MENÜYE DÖN</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Oyun Sonu (Usta Yorumu) Modalı -->
+        <div id="endModal" class="modal-overlay hidden">
+            <div class="modal-card">
+                <!-- Person 5 Usta Fotoğrafı -->
+                <img src="images/person5.png" alt="Usta" class="usta-foto" onerror="this.src='https://via.placeholder.com/90x90/0d2f5c/FF8C32?text=USTA'">
+                
+                <!-- Ustanın Argo/Sanayi Yorumu -->
+                <h2 id="endTitle" style="color: #fff; font-size: 1.25rem;">...</h2>
+                
+                <p id="endMessage" style="color: #FF8C32; font-weight: bold; margin-top: 10px;">Hassasiyetiniz: %0</p>
+                
+                <div style="display: flex; flex-direction: column; gap: 10px; margin-top: 15px;">
+                    <button class="btn" onclick="startGame()">TEKRAR DENE</button>
+                    <button class="btn" style="background: #4a5568;" onclick="window.location.href='gamemenu.html'">ANA MENÜYE DÖN</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const TARGET_SHAPES = [
+            { name: "Tek Kademeli Mil", gen: (n) => { let a=[]; for(let i=0;i<n;i++) a.push(i<n*0.5?1.0:0.55); return a; } },
+            { name: "Çift Kademeli Mil", gen: (n) => { let a=[]; for(let i=0;i<n;i++){ let p=i/n; a.push(p<0.35?1.0:(p<0.70?0.70:0.45)); } return a; } },
+            { name: "Orta Kanallı Mil", gen: (n) => { let a=[]; for(let i=0;i<n;i++){ let p=i/n; a.push((p>=0.25&&p<=0.75)?0.45:1.0); } return a; } },
+            { name: "Çift Kanallı Mil", gen: (n) => { let a=[]; for(let i=0;i<n;i++){ let p=i/n; let isG=(p>0.15&&p<0.40)||(p>0.60&&p<0.85); a.push(isG?0.50:1.0); } return a; } },
+            { name: "Üç Kademeli Mil", gen: (n) => { let a=[]; for(let i=0;i<n;i++){ let p=i/n; a.push(p<0.30?0.45:(p<0.65?0.72:1.0)); } return a; } }
+        ];
+
+        const RESOLUTION = 150;
+        let currentTargetProfile = [];
+        let currentCarvedProfile = [];
+        let activeShapeIndex = 0;
+
+        let gameRunning = false;
+        let isPaused = false;
+        let timeLeft = 20.0;
+        let lastTime = 0;
+
+        let toolPos = { x: 0, y: 1.05 };
+        let angleX = 0, angleY = 0;
+        let sparks = [];
+
+        const targetCanvas = document.getElementById('targetCanvas');
+        const targetCtx = targetCanvas.getContext('2d');
+        const latheCanvas = document.getElementById('latheCanvas');
+        const latheCtx = latheCanvas.getContext('2d');
+
+        function resizeCanvases() {
+            const bArea = document.getElementById('board-area');
+            targetCanvas.width = bArea.clientWidth;
+            targetCanvas.height = bArea.clientHeight;
+
+            const lArea = document.getElementById('lathe-area');
+            latheCanvas.width = lArea.clientWidth;
+            latheCanvas.height = lArea.clientHeight;
+        }
+        window.addEventListener('resize', resizeCanvases);
+
+        // SERBEST SÜRÜKLEME KONTROLÜ
+        let lastTouch = null;
+        const gameArea = document.getElementById('gameArea');
+
+        function onPointerDown(e) {
+            if (!gameRunning || isPaused) return;
+            if (e.target.closest('.btn') || e.target.closest('.modal-overlay')) return;
+            const pt = e.touches ? e.touches[0] : e;
+            lastTouch = { x: pt.clientX, y: pt.clientY };
+        }
+
+        function onPointerMove(e) {
+            if (!gameRunning || isPaused || !lastTouch) return;
+            if (e.cancelable) e.preventDefault(); 
+            
+            const pt = e.touches ? e.touches[0] : e;
+            const dx = pt.clientX - lastTouch.x;
+            const dy = pt.clientY - lastTouch.y;
+            lastTouch = { x: pt.clientX, y: pt.clientY };
+
+            const sensX = 0.003;
+            const sensY = 0.003;
+
+            toolPos.x += dx * sensX;
+            toolPos.y += dy * sensY;
+
+            toolPos.x = Math.max(0, Math.min(1, toolPos.x));
+            toolPos.y = Math.max(0.35, Math.min(1.05, toolPos.y));
+
+            angleX += dx * 0.02;
+            angleY -= dy * 0.02;
+            document.getElementById('wheelX').style.transform = `rotate(${angleX}rad)`;
+            document.getElementById('wheelY').style.transform = `rotate(${angleY}rad)`;
+        }
+
+        function onPointerUp() { lastTouch = null; }
+
+        gameArea.addEventListener('mousedown', onPointerDown);
+        window.addEventListener('mousemove', onPointerMove, { passive: false });
+        window.addEventListener('mouseup', onPointerUp);
+
+        gameArea.addEventListener('touchstart', onPointerDown, { passive: false });
+        window.addEventListener('touchmove', onPointerMove, { passive: false });
+        window.addEventListener('touchend', onPointerUp);
+
+        // OYUN MANTIĞI
+        function initTargetShape() {
+            activeShapeIndex = Math.floor(Math.random() * TARGET_SHAPES.length);
+            currentTargetProfile = TARGET_SHAPES[activeShapeIndex].gen(RESOLUTION);
+            currentCarvedProfile = new Array(RESOLUTION).fill(1.0);
+        }
+
+        function startGame() {
+            resizeCanvases();
+            initTargetShape();
+
+            toolPos = { x: 0, y: 1.05 }; 
+            timeLeft = 20.0;
+            gameRunning = true;
+            isPaused = false;
+            sparks = [];
+            lastTouch = null;
+
+            document.getElementById('startModal').classList.add('hidden');
+            document.getElementById('pauseModal').classList.add('hidden');
+            document.getElementById('endModal').classList.add('hidden');
+
+            lastTime = performance.now();
+            requestAnimationFrame(gameLoop);
+        }
+
+        function togglePause() {
+            if (!gameRunning) return;
+            isPaused = !isPaused;
+            lastTouch = null;
+            const pauseM = document.getElementById('pauseModal');
+            if (isPaused) pauseM.classList.remove('hidden');
+            else {
+                pauseM.classList.add('hidden');
+                lastTime = performance.now();
+                requestAnimationFrame(gameLoop);
+            }
+        }
+
+        function resetGame() { startGame(); }
+
+        // --- YENİ OYUN SONU (USTA YORUMLARI) ---
+        function endGame() {
+            gameRunning = false;
+            const accuracy = calculateAccuracy();
+            
+            let ustaYorumu = "";
+            
+            if (accuracy >= 90) {
+                ustaYorumu = '"Babanda mı tornacıydı lan?"';
+            } else if (accuracy >= 75) {
+                ustaYorumu = '"Sen bu işi biliyon olum!"';
+            } else if (accuracy >= 50) {
+                ustaYorumu = '"Senin yapacağın iş bu kadar olur..."';
+            } else if (accuracy >= 30) {
+                ustaYorumu = '"Hayvan gibi şaapıyosun, metali mundar ettin!"';
+            } else {
+                ustaYorumu = '"Sen ne anlarsın lan bu işten!"';
+            }
+
+            document.getElementById('endTitle').innerText = ustaYorumu;
+            document.getElementById('endMessage').innerHTML = `Hassasiyet: <b>%${accuracy.toFixed(1)}</b>`;
+            document.getElementById('endModal').classList.remove('hidden');
+        }
+
+        function updateCutting() {
+            if (!gameRunning || isPaused) return;
+
+            const toolIndex = Math.floor(toolPos.x * (RESOLUTION - 1));
+            const toolRadius = toolPos.y;
+            const cutWidth = 4;
+            let isCuttingMaterial = false;
+
+            for (let i = Math.max(0, toolIndex - cutWidth); i <= Math.min(RESOLUTION - 1, toolIndex + cutWidth); i++) {
+                if (toolRadius < currentCarvedProfile[i]) {
+                    currentCarvedProfile[i] = toolRadius;
+                    isCuttingMaterial = true;
+                }
+            }
+
+            if (isCuttingMaterial) {
+                const W = latheCanvas.width;
+                const H = latheCanvas.height;
+                const px = toolPos.x * (W * 0.7) + (W * 0.15);
+                const py = (H * 0.5) + (toolRadius * H * 0.35);
+
+                for (let k = 0; k < 3; k++) {
+                    sparks.push({
+                        x: px,
+                        y: py,
+                        vx: (Math.random() - 0.5) * 6,
+                        vy: Math.random() * 5 + 1,
+                        life: 1.0
+                    });
+                }
+            }
+        }
+
+        function calculateAccuracy() {
+            let totalDiff = 0;
+            const minR = 0.35, maxR = 1.0, totalRange = maxR - minR;
+            for (let i = 0; i < RESOLUTION; i++) {
+                const target = currentTargetProfile[i];
+                const carved = currentCarvedProfile[i];
+                if (carved > target) totalDiff += (carved - target);
+                else totalDiff += (target - carved) * 1.8;
+            }
+            const avgDiff = totalDiff / RESOLUTION;
+            return Math.max(0, 100 * (1 - (avgDiff / totalRange)));
+        }
+
+        function gameLoop(now) {
+            if (!gameRunning || isPaused) return;
+
+            const dt = (now - lastTime) / 1000;
+            lastTime = now;
+
+            if (dt > 0) {
+                timeLeft -= dt;
+                if (timeLeft <= 0) {
+                    timeLeft = 0;
+                    document.getElementById('timeDisplay').innerText = "0.0";
+                    endGame();
+                    return;
+                }
+            }
+
+            document.getElementById('timeDisplay').innerText = timeLeft.toFixed(1);
+
+            updateCutting();
+            document.getElementById('accuracyDisplay').innerText = `%${calculateAccuracy().toFixed(1)}`;
+
+            drawTargetBoard();
+            drawLatheWorkpiece();
+
+            requestAnimationFrame(gameLoop);
+        }
+
+        // TAHTA ÇİZİMİ
+        function drawTargetBoard() {
+            const W = targetCanvas.width, H = targetCanvas.height;
+            targetCtx.clearRect(0, 0, W, H);
+
+            targetCtx.fillStyle = "#222222";
+            targetCtx.font = "bold 13px 'Segoe UI', sans-serif";
+            targetCtx.textAlign = "center";
+            targetCtx.fillText(`HEDEF: ${TARGET_SHAPES[activeShapeIndex].name.toUpperCase()}`, W / 2, 18);
+
+            const startX = W * 0.15, lengthX = W * 0.70;
+            const centerY = H * 0.58, maxRadiusPX = H * 0.32;
+
+            targetCtx.beginPath();
+            targetCtx.strokeStyle = "#1a1a1a";
+            targetCtx.lineWidth = 3;
+
+            for (let i = 0; i < RESOLUTION; i++) {
+                const x = startX + (i / (RESOLUTION - 1)) * lengthX;
+                const r = currentTargetProfile[i] * maxRadiusPX;
+                if (i === 0) targetCtx.moveTo(x, centerY - r);
+                else targetCtx.lineTo(x, centerY - r);
+            }
+            for (let i = RESOLUTION - 1; i >= 0; i--) {
+                const x = startX + (i / (RESOLUTION - 1)) * lengthX;
+                const r = currentTargetProfile[i] * maxRadiusPX;
+                targetCtx.lineTo(x, centerY + r);
+            }
+            targetCtx.closePath();
+
+            targetCtx.fillStyle = "rgba(0, 0, 0, 0.12)";
+            targetCtx.fill();
+            targetCtx.stroke();
+        }
+
+        // 3D TORNA TEZGAHI VE AYNA (MANDREN) ÇİZİMİ
+        function drawLatheWorkpiece() {
+            const W = latheCanvas.width, H = latheCanvas.height;
+            latheCtx.clearRect(0, 0, W, H);
+
+            const startX = W * 0.15, lengthX = W * 0.70;
+            const centerY = H * 0.5, maxRadiusPX = H * 0.35;
+
+            // --- 1. DETAYLI 3D TORNA AYNASI (LEFT CHUCK) ---
+            const chuckW = 38;
+            const chuckH = (maxRadiusPX + 18) * 2;
+            const chuckX = startX - chuckW;
+            const chuckY = centerY - (chuckH / 2);
+
+            const flangeGrad = latheCtx.createLinearGradient(0, chuckY - 10, 0, chuckY + chuckH + 10);
+            flangeGrad.addColorStop(0, '#1f2937');
+            flangeGrad.addColorStop(0.5, '#4b5563');
+            flangeGrad.addColorStop(1, '#111827');
+            latheCtx.fillStyle = flangeGrad;
+            latheCtx.fillRect(chuckX - 12, chuckY - 10, 12, chuckH + 20);
+
+            const chuckGrad = latheCtx.createLinearGradient(0, chuckY, 0, chuckY + chuckH);
+            chuckGrad.addColorStop(0, '#4b5563');
+            chuckGrad.addColorStop(0.2, '#9ca3af');
+            chuckGrad.addColorStop(0.4, '#ffffff');
+            chuckGrad.addColorStop(0.7, '#6b7280');
+            chuckGrad.addColorStop(1, '#1f2937');
+
+            latheCtx.fillStyle = chuckGrad;
+            latheCtx.beginPath();
+            latheCtx.roundRect(chuckX, chuckY, chuckW, chuckH, 4);
+            latheCtx.fill();
+            latheCtx.strokeStyle = "#111827";
+            latheCtx.lineWidth = 1.5;
+            latheCtx.stroke();
+
+            latheCtx.fillStyle = "#111827";
+            latheCtx.fillRect(chuckX + 8, chuckY + 12, 10, 10);
+            latheCtx.fillRect(chuckX + 8, chuckY + chuckH - 22, 10, 10);
+
+            latheCtx.strokeStyle = "rgba(0,0,0,0.4)";
+            latheCtx.beginPath();
+            latheCtx.moveTo(chuckX + 24, chuckY);
+            latheCtx.lineTo(chuckX + 24, chuckY + chuckH);
+            latheCtx.stroke();
+
+            const jawW = 16;
+            const jawH = 22;
+            const jawGrad = latheCtx.createLinearGradient(0, 0, 0, H);
+            jawGrad.addColorStop(0, '#e5e7eb');
+            jawGrad.addColorStop(0.5, '#6b7280');
+            jawGrad.addColorStop(1, '#1f2937');
+
+            latheCtx.fillStyle = jawGrad;
+            latheCtx.fillRect(startX - jawW, centerY - maxRadiusPX - 12, jawW, jawH);
+            latheCtx.strokeRect(startX - jawW, centerY - maxRadiusPX - 12, jawW, jawH);
+            latheCtx.fillRect(startX - jawW, centerY + maxRadiusPX - jawH + 12, jawW, jawH);
+            latheCtx.strokeRect(startX - jawW, centerY + maxRadiusPX - jawH + 12, jawW, jawH);
+
+            // --- 2. DÖNER PUNTA (RIGHT TAILSTOCK) ---
+            const tailX = startX + lengthX;
+            const tailGrad = latheCtx.createLinearGradient(0, centerY - 25, 0, centerY + 25);
+            tailGrad.addColorStop(0, '#4b5563');
+            tailGrad.addColorStop(0.5, '#d1d5db');
+            tailGrad.addColorStop(1, '#1f2937');
+
+            latheCtx.beginPath();
+            latheCtx.fillStyle = tailGrad;
+            latheCtx.moveTo(tailX, centerY - 14);
+            latheCtx.lineTo(tailX + 18, centerY - 32);
+            latheCtx.lineTo(tailX + 40, centerY - 32);
+            latheCtx.lineTo(tailX + 40, centerY + 32);
+            latheCtx.lineTo(tailX + 18, centerY + 32);
+            latheCtx.lineTo(tailX, centerY + 14);
+            latheCtx.closePath();
+            latheCtx.fill();
+            latheCtx.strokeStyle = "#111827";
+            latheCtx.stroke();
+
+            latheCtx.beginPath();
+            latheCtx.fillStyle = "#9ca3af";
+            latheCtx.moveTo(tailX, centerY - 14);
+            latheCtx.lineTo(tailX - 10, centerY);
+            latheCtx.lineTo(tailX, centerY + 14);
+            latheCtx.closePath();
+            latheCtx.fill();
+
+            // --- 3. KILAVUZ ÇİZGİ VE İŞ PARÇASI ---
+            latheCtx.beginPath();
+            latheCtx.strokeStyle = "rgba(255, 60, 60, 0.6)";
+            latheCtx.setLineDash([4, 4]);
+            latheCtx.lineWidth = 2;
+            for (let i = 0; i < RESOLUTION; i++) {
+                const x = startX + (i / (RESOLUTION - 1)) * lengthX;
+                const r = currentTargetProfile[i] * maxRadiusPX;
+                if (i === 0) latheCtx.moveTo(x, centerY - r);
+                else latheCtx.lineTo(x, centerY - r);
+            }
+            for (let i = RESOLUTION - 1; i >= 0; i--) {
+                const x = startX + (i / (RESOLUTION - 1)) * lengthX;
+                const r = currentTargetProfile[i] * maxRadiusPX;
+                latheCtx.lineTo(x, centerY + r);
+            }
+            latheCtx.closePath();
+            latheCtx.stroke();
+            latheCtx.setLineDash([]);
+
+            const metalGradient = latheCtx.createLinearGradient(0, centerY - maxRadiusPX, 0, centerY + maxRadiusPX);
+            metalGradient.addColorStop(0, '#64748b');
+            metalGradient.addColorStop(0.25, '#f8fafc');
+            metalGradient.addColorStop(0.5, '#cbd5e1');
+            metalGradient.addColorStop(0.75, '#64748b');
+            metalGradient.addColorStop(1, '#1e293b');
+
+            latheCtx.beginPath();
+            for (let i = 0; i < RESOLUTION; i++) {
+                const x = startX + (i / (RESOLUTION - 1)) * lengthX;
+                const r = currentCarvedProfile[i] * maxRadiusPX;
+                if (i === 0) latheCtx.moveTo(x, centerY - r);
+                else latheCtx.lineTo(x, centerY - r);
+            }
+            for (let i = RESOLUTION - 1; i >= 0; i--) {
+                const x = startX + (i / (RESOLUTION - 1)) * lengthX;
+                const r = currentCarvedProfile[i] * maxRadiusPX;
+                latheCtx.lineTo(x, centerY + r);
+            }
+            latheCtx.closePath();
+            latheCtx.fillStyle = metalGradient;
+            latheCtx.fill();
+            latheCtx.strokeStyle = "#334155";
+            latheCtx.lineWidth = 1.5;
+            latheCtx.stroke();
+
+            // Dönüş Çizgileri
+            if (gameRunning && !isPaused) {
+                latheCtx.strokeStyle = "rgba(255,255,255,0.3)";
+                latheCtx.lineWidth = 1;
+                const speedOffset = (Date.now() / 8) % 20;
+                for (let yOffset = centerY - maxRadiusPX + speedOffset; yOffset < centerY + maxRadiusPX; yOffset += 20) {
+                    latheCtx.beginPath();
+                    latheCtx.moveTo(startX, yOffset);
+                    latheCtx.lineTo(startX + lengthX, yOffset);
+                    latheCtx.stroke();
+                }
+            }
+
+            // Kıvılcımlar
+            for (let i = sparks.length - 1; i >= 0; i--) {
+                const p = sparks[i];
+                p.x += p.vx;
+                p.y += p.vy;
+                p.life -= 0.05;
+                if (p.life <= 0) { sparks.splice(i, 1); continue; }
+                latheCtx.fillStyle = `rgba(255, ${Math.floor(p.life * 200 + 55)}, 0, ${p.life})`;
+                latheCtx.beginPath();
+                latheCtx.arc(p.x, p.y, Math.random() * 2 + 1, 0, Math.PI * 2);
+                latheCtx.fill();
+            }
+
+            // --- 4. TORNA BIÇAĞI VE KATER (ALTTAN KESİM) ---
+            const toolX = startX + toolPos.x * lengthX;
+            const tipY = centerY + (toolPos.y * maxRadiusPX);
+
+            latheCtx.fillStyle = "#1e293b";
+            latheCtx.fillRect(toolX - 12, tipY + 14, 24, H - (tipY + 14));
+            latheCtx.strokeStyle = "#475569";
+            latheCtx.strokeRect(toolX - 12, tipY + 14, 24, H - (tipY + 14));
+
+            latheCtx.beginPath();
+            latheCtx.fillStyle = "#FFD700";
+            latheCtx.moveTo(toolX, tipY);
+            latheCtx.lineTo(toolX - 8, tipY + 14);
+            latheCtx.lineTo(toolX + 8, tipY + 14);
+            latheCtx.closePath();
+            latheCtx.fill();
+            latheCtx.strokeStyle = "#B8860B";
+            latheCtx.stroke();
+        }
+
+        resizeCanvases();
+    </script>
+</body>
+</html>

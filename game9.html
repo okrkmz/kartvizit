@@ -1,0 +1,979 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="theme-color" content="#0d0a18">
+<title>Pro Keser Ustası</title>
+<style>
+    * { box-sizing: border-box; user-select: none; -webkit-user-select: none; -webkit-tap-highlight-color: transparent; }
+    html, body {
+        margin: 0; padding: 0; width: 100%; height: 100%;
+        overflow: hidden; background: #0d0a18; touch-action: none;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    }
+    #game-container {
+        position: relative; width: 100%; height: 100dvh;
+        background: linear-gradient(160deg, #1b1032 0%, #241231 50%, #120a20 100%);
+        background-size: 100% 100%;
+        overflow: hidden;
+    }
+    canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+
+    .hidden { display: none !important; }
+
+    /* Pause butonu */
+    .pause-btn {
+        position: absolute; top: calc(env(safe-area-inset-top, 0px) + 14px); right: 14px;
+        width: 46px; height: 46px; border-radius: 50%; z-index: 30;
+        background: rgba(255,255,255,0.10); border: 1px solid rgba(255,255,255,0.25);
+        backdrop-filter: blur(6px); display: flex; align-items: center; justify-content: center;
+        gap: 5px; cursor: pointer; padding: 0;
+    }
+    .pause-btn i { display: block; width: 5px; height: 16px; background: #fff; border-radius: 2px; }
+
+    /* Modallar — pasifken visibility:hidden (pointer engellemesin) */
+    .modal {
+        position: absolute; inset: 0; z-index: 50;
+        display: flex; flex-direction: column; align-items: center; justify-content: center;
+        background: rgba(8, 6, 22, 0.72); backdrop-filter: blur(10px);
+        visibility: hidden; opacity: 0;
+        transition: opacity 0.25s ease, visibility 0.25s;
+        color: #fff; text-align: center; padding: 24px;
+    }
+    .modal.active { visibility: visible; opacity: 1; }
+
+    .kicker { font-size: 12px; letter-spacing: 4px; color: #7df9ff; opacity: 0.8; margin-bottom: 10px; font-weight: 700; }
+    .title {
+        font-size: clamp(2.4rem, 10vw, 4.2rem); font-weight: 900; line-height: 1.05; margin: 0 0 14px;
+        background: linear-gradient(180deg, #ffffff, #9fd8ff);
+        -webkit-background-clip: text; background-clip: text; color: transparent;
+    }
+    .tag { font-size: 15px; color: rgba(255,255,255,0.75); margin-bottom: 12px; }
+    .warn {
+        font-size: 13px; font-weight: 700; color: #ff8a8a;
+        background: rgba(255, 60, 60, 0.12); border: 1px solid rgba(255, 80, 80, 0.35);
+        padding: 9px 16px; border-radius: 30px; margin-bottom: 18px;
+    }
+    .best { font-size: 14px; color: #ffd60a; font-weight: 700; letter-spacing: 1px; margin-bottom: 22px; }
+
+    h2 { font-size: clamp(2rem, 8vw, 3.2rem); font-weight: 900; margin: 0 0 8px; text-transform: uppercase; letter-spacing: 2px; }
+    .score-big {
+        font-size: clamp(3.4rem, 16vw, 6rem); font-weight: 900; color: #ffd60a; line-height: 1;
+        text-shadow: 0 0 30px rgba(255, 214, 10, 0.45); margin: 6px 0 2px;
+    }
+    .sub { font-size: 14px; color: rgba(255,255,255,0.6); font-weight: 700; letter-spacing: 1px; margin-bottom: 14px; }
+    .record {
+        font-size: 15px; font-weight: 900; color: #0d0a18; background: #ffd60a;
+        padding: 8px 18px; border-radius: 30px; margin-bottom: 18px;
+        box-shadow: 0 0 25px rgba(255,214,10,0.5);
+    }
+    .btnrow { display: flex; gap: 14px; margin-top: 8px; }
+    .btn {
+        padding: 15px 38px; font-size: 1.05rem; font-weight: 800; letter-spacing: 1px;
+        color: #0d0a18; background: #fff; border: none; border-radius: 30px;
+        cursor: pointer; text-decoration: none; display: inline-block;
+        box-shadow: 0 6px 25px rgba(255,255,255,0.18); transition: transform 0.1s;
+    }
+    .btn:active { transform: scale(0.94); }
+    .btn.ghost { background: transparent; color: #fff; border: 2px solid rgba(255,255,255,0.4); box-shadow: none; }
+    .btn.big { padding: 17px 60px; font-size: 1.2rem; }
+</style>
+</head>
+<body>
+
+<div id="game-container">
+    <canvas id="cv"></canvas>
+
+    <button id="pauseBtn" class="pause-btn hidden" aria-label="Durdur"><i></i><i></i></button>
+
+    <!-- BAŞLANGIÇ -->
+    <div id="startModal" class="modal active">
+        <div class="kicker">ARKADE</div>
+        <h1 class="title">PRO KESER<br>USTASI</h1>
+        <div class="tag">Kaydır, kes, kombo yap!</div>
+        <div class="warn">🔴 Kırmızı halkalı olan PATLAR — sakın kesme!</div>
+        <div class="best" id="startBest">REKOR: 0</div>
+        <button class="btn big" id="startBtn">BAŞLA</button>
+    </div>
+
+    <!-- DURAKLAT -->
+    <div id="pauseModal" class="modal">
+        <h2>DURAKLATILDI</h2>
+        <div class="btnrow">
+            <button class="btn" id="resumeBtn">DEVAM</button>
+            <a class="btn ghost" href="gamemenu.html">MENÜ</a>
+        </div>
+    </div>
+
+    <!-- OYUN SONU -->
+    <div id="overModal" class="modal">
+        <h2 id="overTitle">PATLADIN!</h2>
+        <div class="score-big" id="overScore">0</div>
+        <div class="sub" id="overBest">REKOR: 0</div>
+        <div class="record hidden" id="newRecord">🏆 YENİ REKOR!</div>
+        <div class="btnrow">
+            <button class="btn" id="retryBtn">TEKRAR</button>
+            <a class="btn ghost" href="gamemenu.html">MENÜ</a>
+        </div>
+    </div>
+</div>
+
+<script>
+'use strict';
+const TAU = Math.PI * 2;
+const rand = (a, b) => a + Math.random() * (b - a);
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const lerp = (a, b, t) => a + (b - a) * t;
+
+const FRUITS = [
+    { src: 'images/person1.png', color: '#ff3b30', bomb: true },
+    { src: 'images/person2.png', color: '#00e5ff' },
+    { src: 'images/person3.png', color: '#ffd60a' },
+    { src: 'images/person4.png', color: '#ff4fa3' },
+    { src: 'images/person5.png', color: '#a6ff4d' }
+];
+
+const TRAIL_MS = 200;
+const MIN_SLICE_SPEED = 0.35; // px/ms
+
+/* ---------------- SES MOTORU (dosyasız, Web Audio) ---------------- */
+class SFX {
+    constructor() { this.ok = false; }
+    init() {
+        if (this.ok) { try { this.ctx.resume(); } catch (e) {} return; }
+        try {
+            const AC = window.AudioContext || window.webkitAudioContext;
+            this.ctx = new AC();
+            this.master = this.ctx.createGain();
+            this.master.gain.value = 0.4;
+            this.master.connect(this.ctx.destination);
+            const len = this.ctx.sampleRate * 0.6;
+            const buf = this.ctx.createBuffer(1, len, this.ctx.sampleRate);
+            const d = buf.getChannelData(0);
+            for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
+            this.noise = buf;
+            this.ok = true;
+        } catch (e) {}
+    }
+    _noiseHit(dur, f0, f1, type, peak) {
+        if (!this.ok) return;
+        const t = this.ctx.currentTime;
+        const src = this.ctx.createBufferSource(); src.buffer = this.noise;
+        const flt = this.ctx.createBiquadFilter(); flt.type = type; flt.Q.value = 1;
+        flt.frequency.setValueAtTime(f0, t);
+        flt.frequency.exponentialRampToValueAtTime(Math.max(30, f1), t + dur);
+        const g = this.ctx.createGain();
+        g.gain.setValueAtTime(0.0001, t);
+        g.gain.exponentialRampToValueAtTime(peak, t + 0.015);
+        g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+        src.connect(flt); flt.connect(g); g.connect(this.master);
+        src.start(t); src.stop(t + dur + 0.05);
+    }
+    _tone(freq0, freq1, dur, type, peak) {
+        if (!this.ok) return;
+        const t = this.ctx.currentTime;
+        const o = this.ctx.createOscillator(); o.type = type;
+        o.frequency.setValueAtTime(freq0, t);
+        o.frequency.exponentialRampToValueAtTime(Math.max(20, freq1), t + dur);
+        const g = this.ctx.createGain();
+        g.gain.setValueAtTime(0.0001, t);
+        g.gain.exponentialRampToValueAtTime(peak, t + 0.015);
+        g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+        o.connect(g); g.connect(this.master);
+        o.start(t); o.stop(t + dur + 0.05);
+    }
+    whoosh() { this._noiseHit(0.14, 700 + rand(0, 400), 2600, 'bandpass', 0.4); }
+    toss()   { this._noiseHit(0.18, 300, 900, 'bandpass', 0.15); }
+    splat()  { this._noiseHit(0.09, 600, 200, 'lowpass', 0.45); this._tone(170, 90, 0.08, 'square', 0.12); }
+    miss()   { this._tone(220, 120, 0.22, 'sawtooth', 0.18); }
+    warn()   { this._tone(90, 60, 0.35, 'sine', 0.25); }
+    boom()   { this._noiseHit(0.7, 900, 60, 'lowpass', 0.9); this._tone(130, 35, 0.55, 'sine', 0.8); }
+    combo(n) { this._tone(440 + n * 60, (440 + n * 60) * 1.5, 0.16, 'triangle', 0.3); }
+    level()  { this._tone(520, 780, 0.12, 'triangle', 0.25); setTimeout(() => this._tone(780, 1040, 0.16, 'triangle', 0.25), 90); }
+}
+const sfx = new SFX();
+function vib(p) { try { if (navigator.vibrate) navigator.vibrate(p); } catch (e) {} }
+
+/* ---------------- OYUN ---------------- */
+class Game {
+    constructor() {
+        this.canvas = document.getElementById('cv');
+        this.ctx = this.canvas.getContext('2d');
+
+        this.imgs = FRUITS.map(f => { const im = new Image(); im.src = f.src; return im; });
+
+        this.state = 'menu';   // menu | playing | paused | dying | over
+        this.trails = new Map();
+        this.fruits = []; this.halves = []; this.drops = []; this.adds = [];
+        this.smokes = []; this.shocks = []; this.stains = []; this.cuts = []; this.pops = [];
+        this.embers = [];
+        this.pending = [];
+        this.comboBanner = null; this.levelBanner = null;
+        this.flash = 0; this.missFlash = 0; this.shake = 0;
+        this.timescale = 1; this.deathT = 0; this.deathReason = '';
+        this.hudP = 0; this.lastWhoosh = 0;
+
+        this.best = 0;
+        try { this.best = parseInt(localStorage.getItem('prokeser_best') || '0', 10) || 0; } catch (e) {}
+        document.getElementById('startBest').textContent = 'REKOR: ' + this.best;
+
+        this.resize();
+        this.resetWorld();
+        this.bindInput();
+        this.bindUI();
+
+        this.last = performance.now();
+        requestAnimationFrame(t => this.loop(t));
+    }
+
+    /* ---------- boyut / arka plan ---------- */
+    resize() {
+        this.dpr = Math.min(window.devicePixelRatio || 1, 2);
+        this.W = window.innerWidth;
+        this.H = window.innerHeight;
+        this.canvas.width = this.W * this.dpr;
+        this.canvas.height = this.H * this.dpr;
+        this.ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
+        this.G = this.H * 1.55; // px/s²
+        this.buildBg();
+        this.embers = [];
+        for (let i = 0; i < 34; i++) {
+            this.embers.push({ x: rand(0, this.W), y: rand(0, this.H), v: rand(8, 26),
+                s: rand(1, 2.4), ph: rand(0, TAU), warm: Math.random() < 0.7 });
+        }
+    }
+
+    buildBg() {
+        const c = document.createElement('canvas');
+        c.width = this.W * this.dpr; c.height = this.H * this.dpr;
+        const g = c.getContext('2d');
+        g.scale(this.dpr, this.dpr);
+        const W = this.W, H = this.H;
+
+        let lg = g.createLinearGradient(0, 0, 0, H);
+        lg.addColorStop(0, '#1b1032'); lg.addColorStop(0.55, '#241231'); lg.addColorStop(1, '#120a20');
+        g.fillStyle = lg; g.fillRect(0, 0, W, H);
+
+        let spot = g.createRadialGradient(W / 2, H * 0.42, 10, W / 2, H * 0.42, H * 0.65);
+        spot.addColorStop(0, 'rgba(150,110,255,0.16)');
+        spot.addColorStop(0.5, 'rgba(255,140,60,0.05)');
+        spot.addColorStop(1, 'rgba(0,0,0,0)');
+        g.fillStyle = spot; g.fillRect(0, 0, W, H);
+
+        g.strokeStyle = 'rgba(255,255,255,0.045)';
+        g.lineWidth = Math.max(20, W * 0.04);
+        g.beginPath(); g.arc(W / 2, H * 0.42, Math.min(W, H) * 0.42, 0, TAU); g.stroke();
+
+        g.strokeStyle = 'rgba(255,255,255,0.02)'; g.lineWidth = 1;
+        for (let x = -H; x < W; x += 46) {
+            g.beginPath(); g.moveTo(x, 0); g.lineTo(x + H, H); g.stroke();
+        }
+
+        let floor = g.createRadialGradient(W / 2, H * 1.05, 20, W / 2, H * 1.05, H * 0.5);
+        floor.addColorStop(0, 'rgba(0,0,0,0.55)'); floor.addColorStop(1, 'rgba(0,0,0,0)');
+        g.fillStyle = floor; g.fillRect(0, 0, W, H);
+
+        let vig = g.createRadialGradient(W / 2, H / 2, Math.min(W, H) * 0.35, W / 2, H / 2, Math.max(W, H) * 0.75);
+        vig.addColorStop(0, 'rgba(0,0,0,0)'); vig.addColorStop(1, 'rgba(0,0,0,0.55)');
+        g.fillStyle = vig; g.fillRect(0, 0, W, H);
+
+        this.bg = c;
+    }
+
+    /* ---------- dünya / akış ---------- */
+    resetWorld() {
+        this.fruits = []; this.halves = []; this.drops = []; this.adds = [];
+        this.smokes = []; this.shocks = []; this.stains = []; this.cuts = []; this.pops = [];
+        this.pending = [];
+        this.comboBanner = null; this.levelBanner = null;
+        this.score = 0; this.lives = 3; this.level = 1;
+        this.comboCount = 0; this.comboTime = 0;
+        this.spawnT = 0.8; this.menuT = 0.7;
+        this.flash = 0; this.missFlash = 0; this.shake = 0;
+        this.timescale = 1; this.deathT = 0;
+    }
+
+    start() {
+        sfx.init();
+        this.resetWorld();
+        this.state = 'playing';
+        document.getElementById('startModal').classList.remove('active');
+        document.getElementById('overModal').classList.remove('active');
+        document.getElementById('pauseBtn').classList.remove('hidden');
+    }
+
+    pause() {
+        if (this.state !== 'playing') return;
+        this.state = 'paused';
+        document.getElementById('pauseModal').classList.add('active');
+    }
+
+    resume() {
+        if (this.state !== 'paused') return;
+        this.state = 'playing';
+        document.getElementById('pauseModal').classList.remove('active');
+    }
+
+    beginDeath(reason) {
+        this.state = 'dying';
+        this.deathReason = reason;
+        this.deathT = reason === 'bomb' ? 1.1 : 0.6;
+        this.timescale = reason === 'bomb' ? 0.22 : 0.45;
+        document.getElementById('pauseBtn').classList.add('hidden');
+    }
+
+    finishGameOver() {
+        this.state = 'over';
+        this.timescale = 1;
+        const isRecord = this.score > this.best;
+        if (isRecord) {
+            this.best = this.score;
+            try { localStorage.setItem('prokeser_best', String(this.best)); } catch (e) {}
+        }
+        document.getElementById('overTitle').textContent =
+            this.deathReason === 'bomb' ? 'PATLADIN! 💥' : 'OYUN BİTTİ';
+        document.getElementById('overScore').textContent = this.score;
+        document.getElementById('overBest').textContent = 'REKOR: ' + this.best;
+        document.getElementById('newRecord').classList.toggle('hidden', !isRecord);
+        document.getElementById('overModal').classList.add('active');
+    }
+
+    loseLife(f) {
+        this.lives--;
+        this.missFlash = 1;
+        sfx.miss();
+        this.pops.push({ x: f.x, y: this.H - 90, txt: 'KAÇTI!', color: '#ff5b5b', t: 0 });
+        if (this.lives <= 0) this.beginDeath('miss');
+    }
+
+    /* ---------- dalga / fırlatma ---------- */
+    levelOf(score) { return Math.min(1 + Math.floor(score / 12), 12); }
+
+    buildWave() {
+        const lvl = this.level;
+        let count = 1;
+        const r = Math.random();
+        const p2 = Math.min(0.12 + 0.09 * lvl, 0.6);
+        const p3 = lvl >= 2 ? Math.min(0.05 + 0.07 * lvl, 0.45) : 0;
+        const p4 = lvl >= 4 ? Math.min(0.02 + 0.05 * (lvl - 3), 0.3) : 0;
+        if (r < p4) count = 4; else if (r < p4 + p3) count = 3; else if (r < p4 + p3 + p2) count = 2;
+
+        const bombChance = lvl >= 2 ? Math.min(0.05 + 0.025 * (lvl - 1), 0.22) : 0;
+        let bombPlaced = false;
+        for (let i = 0; i < count; i++) {
+            const isBomb = !bombPlaced && Math.random() < bombChance;
+            if (isBomb) bombPlaced = true;
+            this.pending.push({ t: i * rand(80, 260) / 1000, bomb: isBomb });
+        }
+        this.spawnT = rand(0.9, 1.4) * lerp(1.6, 0.75, (lvl - 1) / 10);
+    }
+
+    launch(isBomb) {
+        const idx = isBomb ? 0 : 1 + Math.floor(Math.random() * 4);
+        const def = FRUITS[idx];
+        const r = clamp(Math.min(this.W, this.H) * 0.095, 28, 60);
+        const peak = rand(0.58, 0.75);
+        this.fruits.push({
+            def, img: this.imgs[idx], bomb: !!def.bomb, color: def.color,
+            x: rand(this.W * 0.18, this.W * 0.82),
+            y: this.H + r,
+            vx: rand(-0.16, 0.16) * this.W,
+            vy: -Math.sqrt(2 * this.G * this.H * peak),
+            r, rot: rand(0, TAU), vrot: rand(-2.8, 2.8),
+            dead: false
+        });
+        if (isBomb) sfx.warn(); else sfx.toss();
+    }
+
+    /* ---------- kesme ---------- */
+    segHit(ax, ay, bx, by, cx, cy, r) {
+        const dx = bx - ax, dy = by - ay;
+        const L2 = dx * dx + dy * dy;
+        let t = L2 > 0 ? ((cx - ax) * dx + (cy - ay) * dy) / L2 : 0;
+        t = clamp(t, 0, 1);
+        const px = ax + dx * t, py = ay + dy * t;
+        const ddx = cx - px, ddy = cy - py;
+        return (ddx * ddx + ddy * ddy) <= r * r;
+    }
+
+    doSlice(f, seg) {
+        f.dead = true;
+        const len = Math.max(1, Math.hypot(seg.bx - seg.ax, seg.by - seg.ay));
+        const dx = (seg.bx - seg.ax) / len, dy = (seg.by - seg.ay) / len;
+        const nx = -dy, ny = dx;
+        const cutAngle = Math.atan2(dy, dx);
+
+        // iki yarım
+        for (const side of [-1, 1]) {
+            const sep = rand(80, 150);
+            this.halves.push({
+                img: f.img, r: f.r, color: f.color,
+                x: f.x + nx * side * 4, y: f.y + ny * side * 4,
+                vx: f.vx * 0.6 + nx * side * sep + dx * rand(-30, 30),
+                vy: f.vy * 0.5 - this.H * rand(0.06, 0.12),
+                rot: cutAngle, vrot: side * rand(1.5, 3.0), side, dead: false
+            });
+        }
+
+        // kesim çizgisi parlaması
+        const ex = dx * f.r * 0.9, ey = dy * f.r * 0.9;
+        this.cuts.push({ x1: f.x - ex * 1.5, y1: f.y - ey * 1.5, x2: f.x + ex * 1.5, y2: f.y + ey * 1.5, t: 0, max: 0.22 });
+
+        // suyu
+        for (let i = 0; i < 16; i++) {
+            const a = rand(0, TAU), sp = rand(0.12, 0.5) * this.H;
+            this.drops.push({
+                x: f.x + rand(-f.r * 0.4, f.r * 0.4), y: f.y + rand(-f.r * 0.4, f.r * 0.4),
+                vx: Math.cos(a) * sp, vy: Math.sin(a) * sp - this.H * 0.08,
+                size: rand(2, 5), life: 0, max: rand(0.45, 0.8), color: f.color
+            });
+        }
+
+        // halka flaşı + kıvılcım
+        this.shocks.push({ x: f.x, y: f.y, r: f.r * 0.5, vr: this.H * 0.9, w: 3, life: 0, max: 0.35, color: f.color });
+        for (let i = 0; i < 6; i++) {
+            const a = rand(0, TAU), sp = rand(0.2, 0.55) * this.H;
+            this.adds.push({ x: f.x, y: f.y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp,
+                size: rand(1.5, 3), life: 0, max: rand(0.2, 0.4), color: '#ffffff', grav: 300, drag: 2 });
+        }
+
+        // leke
+        const blobs = [];
+        for (let i = 0; i < 6; i++) blobs.push({ dx: rand(-f.r, f.r), dy: rand(-f.r, f.r), rr: rand(f.r * 0.25, f.r * 0.6) });
+        this.stains.push({ x: f.x, y: f.y, r: f.r * 0.9, color: f.color, alpha: 0.4, blobs });
+        if (this.stains.length > 26) this.stains.shift();
+
+        if (this.state === 'playing') {
+            const now = performance.now();
+            if (now - this.comboTime < 380) this.comboCount++; else this.comboCount = 1;
+            this.comboTime = now;
+            let gained = 1;
+            if (this.comboCount >= 2) {
+                gained += this.comboCount;
+                this.comboBanner = { txt: 'KOMBO x' + this.comboCount, t: 0, color: f.color };
+                sfx.combo(this.comboCount);
+            }
+            this.score += gained;
+            this.hudP = 1;
+            const nl = this.levelOf(this.score);
+            if (nl > this.level) { this.level = nl; this.levelBanner = { txt: 'SEVİYE ' + nl, t: 0 }; sfx.level(); }
+            this.pops.push({ x: f.x, y: f.y - f.r * 0.6, txt: '+' + gained, color: f.color, t: 0 });
+        }
+
+        sfx.splat();
+        vib(12);
+    }
+
+    explode(f) {
+        f.dead = true;
+        this.flash = 1;
+        this.shake = 26;
+        this.shocks.push({ x: f.x, y: f.y, r: 10, vr: this.H * 2.4, w: 12, life: 0, max: 0.55, color: '#ffd0a0' });
+        this.shocks.push({ x: f.x, y: f.y, r: 6, vr: this.H * 1.4, w: 6, life: 0, max: 0.7, color: '#ff5030' });
+        const fireCols = ['#ffffff', '#ffe082', '#ff9800', '#ff5722'];
+        for (let i = 0; i < 44; i++) {
+            const a = rand(0, TAU), sp = rand(0.2, 0.85) * this.H;
+            this.adds.push({ x: f.x, y: f.y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp,
+                size: rand(3, 10), life: 0, max: rand(0.4, 0.9),
+                color: fireCols[Math.floor(Math.random() * fireCols.length)], grav: 250, drag: 1.6 });
+        }
+        for (let i = 0; i < 16; i++) {
+            const a = rand(0, TAU), sp = rand(0.5, 1.1) * this.H;
+            this.adds.push({ x: f.x, y: f.y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp,
+                size: rand(1.5, 2.5), life: 0, max: rand(0.25, 0.45), color: '#ffffff', grav: 0, drag: 2.5 });
+        }
+        for (let i = 0; i < 14; i++) {
+            this.smokes.push({ x: f.x + rand(-14, 14), y: f.y + rand(-14, 14),
+                vx: rand(-25, 25), vy: rand(-55, -15), r: rand(12, 28), vr: rand(26, 44),
+                life: 0, max: rand(0.9, 1.5) });
+        }
+        sfx.boom();
+        vib([60, 40, 140]);
+        this.beginDeath('bomb');
+    }
+
+    /* ---------- girişler ---------- */
+    bindUI() {
+        document.getElementById('startBtn').addEventListener('click', () => this.start());
+        document.getElementById('startModal').addEventListener('click', (e) => {
+            if (e.target.id === 'startModal') this.start();
+        });
+        document.getElementById('retryBtn').addEventListener('click', () => this.start());
+        document.getElementById('pauseBtn').addEventListener('click', () => this.pause());
+        document.getElementById('resumeBtn').addEventListener('click', () => this.resume());
+        document.addEventListener('visibilitychange', () => {
+            if (document.hidden && this.state === 'playing') this.pause();
+        });
+        window.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                if (this.state === 'playing') this.pause();
+                else if (this.state === 'paused') this.resume();
+            }
+        });
+        window.addEventListener('resize', () => this.resize());
+    }
+
+    bindInput() {
+        const pos = (e) => ({ x: e.clientX, y: e.clientY });
+
+        this.canvas.parentElement.addEventListener('pointerdown', (e) => {
+            if (this.state !== 'playing' && this.state !== 'menu') return;
+            if (e.pointerType === 'mouse' && e.button !== 0) return;
+            const p = pos(e);
+            this.trails.set(e.pointerId, { pts: [{ x: p.x, y: p.y, t: performance.now() }], active: true });
+        });
+
+        window.addEventListener('pointermove', (e) => {
+            const tr = this.trails.get(e.pointerId);
+            if (!tr || !tr.active) return;
+            const now = performance.now();
+            const p = pos(e);
+            const last = tr.pts[tr.pts.length - 1];
+            if (!last) return;
+            const dist = Math.hypot(p.x - last.x, p.y - last.y);
+            const dtms = Math.max(1, now - last.t);
+            const speed = dist / dtms;
+
+            tr.pts.push({ x: p.x, y: p.y, t: now });
+            if (tr.pts.length > 30) tr.pts.shift();
+
+            // kıvılcım izi
+            if (speed > 0.5 && dist > 3) {
+                for (let i = 0; i < 2; i++) {
+                    this.adds.push({
+                        x: p.x + rand(-3, 3), y: p.y + rand(-3, 3),
+                        vx: rand(-60, 60), vy: rand(-60, 60),
+                        size: rand(1.5, 3), life: 0, max: rand(0.15, 0.3),
+                        color: Math.random() < 0.5 ? '#ffffff' : '#7df9ff', grav: 250, drag: 3
+                    });
+                }
+                if (now - this.lastWhoosh > 120 && speed > 0.6) { sfx.whoosh(); this.lastWhoosh = now; }
+            }
+
+            // kesme testi
+            if (speed > MIN_SLICE_SPEED && dist > 3) {
+                const seg = { ax: last.x, ay: last.y, bx: p.x, by: p.y };
+                const hits = [];
+                for (const f of this.fruits) {
+                    if (f.dead) continue;
+                    if (this.segHit(seg.ax, seg.ay, seg.bx, seg.by, f.x, f.y, f.r * 1.02)) hits.push(f);
+                }
+                for (const f of hits) {
+                    if (f.bomb) this.explode(f);
+                    else this.doSlice(f, seg);
+                }
+                if (hits.length) this.fruits = this.fruits.filter(f => !f.dead);
+            }
+        }, { passive: true });
+
+        const lift = (e) => {
+            const tr = this.trails.get(e.pointerId);
+            if (tr) tr.active = false;
+        };
+        window.addEventListener('pointerup', lift);
+        window.addEventListener('pointercancel', lift);
+        window.addEventListener('contextmenu', e => e.preventDefault());
+    }
+
+    /* ---------- güncelleme ---------- */
+    update(dt) {
+        const now = performance.now();
+
+        // iz solması
+        for (const [id, tr] of this.trails) {
+            while (tr.pts.length && now - tr.pts[0].t > TRAIL_MS) tr.pts.shift();
+            if (!tr.active && tr.pts.length === 0) this.trails.delete(id);
+        }
+
+        // kor (ambient) — her durumda
+        for (const em of this.embers) {
+            em.y -= em.v * dt;
+            em.ph += dt * 2;
+            em.x += Math.sin(em.ph) * 8 * dt;
+            if (em.y < -10) { em.y = this.H + 10; em.x = rand(0, this.W); }
+        }
+
+        // afaki menü fırlatmaları
+        if (this.state === 'menu') {
+            this.menuT -= dt;
+            if (this.menuT <= 0) { this.launch(false); this.menuT = rand(0.9, 1.7); }
+        }
+
+        const active = (this.state === 'playing' || this.state === 'dying' || this.state === 'menu');
+        if (!active) return;
+
+        const gdt = dt * this.timescale;
+
+        if (this.state === 'playing') {
+            this.spawnT -= gdt;
+            if (this.spawnT <= 0) this.buildWave();
+            for (let i = this.pending.length - 1; i >= 0; i--) {
+                this.pending[i].t -= gdt;
+                if (this.pending[i].t <= 0) {
+                    this.launch(this.pending[i].bomb);
+                    this.pending.splice(i, 1);
+                }
+            }
+        }
+
+        // meyveler
+        for (const f of this.fruits) {
+            f.vy += this.G * gdt;
+            f.x += f.vx * gdt;
+            f.y += f.vy * gdt;
+            f.rot += f.vrot * gdt;
+            if (f.vy > 0 && f.y > this.H + f.r * 1.6) {
+                f.dead = true;
+                if (this.state === 'playing' && !f.bomb) this.loseLife(f);
+            }
+        }
+        this.fruits = this.fruits.filter(f => !f.dead);
+
+        // yarimlar
+        for (const h of this.halves) {
+            h.vy += this.G * gdt;
+            h.x += h.vx * gdt; h.y += h.vy * gdt; h.rot += h.vrot * gdt;
+            if (h.y > this.H + h.r * 2.2) h.dead = true;
+        }
+        this.halves = this.halves.filter(h => !h.dead);
+
+        // parçacıklar
+        for (const d of this.drops) {
+            d.vy += this.G * gdt;
+            d.x += d.vx * gdt; d.y += d.vy * gdt; d.life += gdt;
+        }
+        this.drops = this.drops.filter(d => d.life < d.max);
+
+        for (const a of this.adds) {
+            a.vx *= (1 - (a.drag || 0) * gdt);
+            a.vy = a.vy * (1 - (a.drag || 0) * gdt) + (a.grav || 0) * gdt;
+            a.x += a.vx * gdt; a.y += a.vy * gdt; a.life += gdt;
+        }
+        this.adds = this.adds.filter(a => a.life < a.max);
+        if (this.adds.length > 400) this.adds.splice(0, this.adds.length - 400);
+
+        for (const s of this.smokes) {
+            s.x += s.vx * gdt; s.y += s.vy * gdt; s.r += s.vr * gdt; s.life += gdt;
+        }
+        this.smokes = this.smokes.filter(s => s.life < s.max);
+
+        for (const s of this.shocks) { s.r += s.vr * gdt; s.life += gdt; }
+        this.shocks = this.shocks.filter(s => s.life < s.max);
+
+        for (const s of this.stains) s.alpha -= 0.05 * gdt;
+        this.stains = this.stains.filter(s => s.alpha > 0);
+
+        for (const c of this.cuts) c.t += gdt;
+        this.cuts = this.cuts.filter(c => c.t < c.max);
+
+        for (const p of this.pops) { p.y -= 55 * gdt; p.t += gdt; }
+        this.pops = this.pops.filter(p => p.t < 0.9);
+
+        if (this.comboBanner) { this.comboBanner.t += dt; if (this.comboBanner.t > 0.95) this.comboBanner = null; }
+        if (this.levelBanner) { this.levelBanner.t += dt; if (this.levelBanner.t > 1.1) this.levelBanner = null; }
+
+        // ölüm sayacı (gerçek zaman)
+        if (this.state === 'dying') {
+            this.deathT -= dt;
+            if (this.deathT <= 0) this.finishGameOver();
+        }
+
+        // efekt sönümleri
+        this.flash = Math.max(0, this.flash - dt * 2.2);
+        this.missFlash = Math.max(0, this.missFlash - dt * 1.6);
+        this.shake = Math.max(0, this.shake - this.shake * 9 * dt - 2 * dt);
+        this.hudP = Math.max(0, this.hudP - dt * 4);
+    }
+
+    /* ---------- çizim ---------- */
+    drawHeadInto(img, pr) {
+        this.ctx.save();
+        this.ctx.beginPath(); this.ctx.arc(0, 0, pr, 0, TAU); this.ctx.clip();
+        if (img && img.complete && img.naturalWidth > 0) {
+            const iw = img.naturalWidth, ih = img.naturalHeight;
+            const s = Math.min(iw, ih);
+            this.ctx.drawImage(img, (iw - s) / 2, (ih - s) / 2, s, s, -pr, -pr, pr * 2, pr * 2);
+        } else {
+            this.ctx.fillStyle = '#3a3a4a';
+            this.ctx.fillRect(-pr, -pr, pr * 2, pr * 2);
+        }
+        this.ctx.restore();
+    }
+
+    drawFruit(f, now) {
+        const ctx = this.ctx, r = f.r;
+        ctx.save();
+        ctx.translate(f.x, f.y);
+
+        ctx.save();
+        ctx.rotate(f.rot);
+        // halka
+        ctx.shadowColor = f.color; ctx.shadowBlur = r * 0.55;
+        ctx.strokeStyle = f.color; ctx.lineWidth = Math.max(3, r * 0.13);
+        ctx.beginPath(); ctx.arc(0, 0, r * 0.94, 0, TAU); ctx.stroke();
+        ctx.shadowBlur = 0;
+        // foto
+        const pr = r * 0.84;
+        this.drawHeadInto(f.img, pr);
+        if (f.bomb) {
+            ctx.fillStyle = 'rgba(255,30,30,0.30)';
+            ctx.beginPath(); ctx.arc(0, 0, pr, 0, TAU); ctx.fill();
+        }
+        // parlama
+        ctx.fillStyle = 'rgba(255,255,255,0.16)';
+        ctx.beginPath(); ctx.arc(-pr * 0.32, -pr * 0.36, pr * 0.42, 0, TAU); ctx.fill();
+        ctx.restore();
+
+        if (f.bomb) {
+            const pulse = 0.5 + 0.5 * Math.sin(now * 0.009);
+            ctx.strokeStyle = 'rgba(255,60,60,' + (0.45 + 0.45 * pulse).toFixed(3) + ')';
+            ctx.lineWidth = Math.max(2, r * 0.09);
+            ctx.shadowColor = '#ff2020'; ctx.shadowBlur = r * (0.7 + 0.6 * pulse);
+            ctx.beginPath(); ctx.arc(0, 0, r * 1.08, 0, TAU); ctx.stroke();
+            ctx.shadowBlur = 0;
+            const ba = -2.35;
+            const bx = Math.cos(ba) * r * 0.8, by = Math.sin(ba) * r * 0.8;
+            ctx.fillStyle = '#ff2222';
+            ctx.shadowColor = '#ff2020'; ctx.shadowBlur = 12;
+            ctx.beginPath(); ctx.arc(bx, by, r * 0.34, 0, TAU); ctx.fill();
+            ctx.shadowBlur = 0;
+            ctx.fillStyle = '#fff';
+            ctx.font = 'bold ' + (r * 0.44) + 'px Arial';
+            ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+            ctx.fillText('!', bx, by + 1);
+        }
+        ctx.restore();
+    }
+
+    drawHalf(h) {
+        const ctx = this.ctx, r = h.r, pr = r * 0.84;
+        ctx.save();
+        ctx.translate(h.x, h.y);
+        ctx.rotate(h.rot);
+        ctx.beginPath();
+        if (h.side < 0) ctx.rect(-r * 1.4, -r * 1.4, r * 2.8, r * 1.4);
+        else ctx.rect(-r * 1.4, 0, r * 2.8, r * 1.4);
+        ctx.clip();
+        this.drawHeadInto(h.img, pr);
+        ctx.strokeStyle = h.color;
+        ctx.lineWidth = 3;
+        ctx.shadowColor = h.color; ctx.shadowBlur = 8;
+        ctx.beginPath(); ctx.moveTo(-pr, 0); ctx.lineTo(pr, 0); ctx.stroke();
+        ctx.shadowBlur = 0;
+        ctx.restore();
+    }
+
+    drawHeart(cx, cy, s, filled) {
+        const ctx = this.ctx;
+        ctx.beginPath();
+        ctx.moveTo(cx, cy + s * 0.32);
+        ctx.bezierCurveTo(cx, cy - s * 0.28, cx - s * 0.6, cy - s * 0.28, cx - s * 0.6, cy + s * 0.12);
+        ctx.bezierCurveTo(cx - s * 0.6, cy + s * 0.45, cx - s * 0.2, cy + s * 0.6, cx, cy + s * 0.85);
+        ctx.bezierCurveTo(cx + s * 0.2, cy + s * 0.6, cx + s * 0.6, cy + s * 0.45, cx + s * 0.6, cy + s * 0.12);
+        ctx.bezierCurveTo(cx + s * 0.6, cy - s * 0.28, cx, cy - s * 0.28, cx, cy + s * 0.32);
+        ctx.closePath();
+        if (filled) {
+            ctx.fillStyle = '#ff4b5c';
+            ctx.shadowColor = '#ff4b5c'; ctx.shadowBlur = 8;
+            ctx.fill(); ctx.shadowBlur = 0;
+        } else {
+            ctx.strokeStyle = 'rgba(255,255,255,0.3)'; ctx.lineWidth = 2; ctx.stroke();
+        }
+    }
+
+    render() {
+        const ctx = this.ctx, W = this.W, H = this.H;
+        const now = performance.now();
+        ctx.clearRect(0, 0, W, H);
+
+        ctx.save();
+        if (this.shake > 0.3) ctx.translate(rand(-1, 1) * this.shake, rand(-1, 1) * this.shake);
+
+        ctx.drawImage(this.bg, 0, 0, W, H);
+
+        // kor
+        ctx.globalCompositeOperation = 'lighter';
+        for (const em of this.embers) {
+            const a = 0.25 + 0.2 * Math.sin(em.ph * 1.7);
+            ctx.fillStyle = em.warm ? 'rgba(255,160,70,' + a.toFixed(3) + ')' : 'rgba(120,220,255,' + (a * 0.7).toFixed(3) + ')';
+            ctx.beginPath(); ctx.arc(em.x, em.y, em.s, 0, TAU); ctx.fill();
+        }
+        ctx.globalCompositeOperation = 'source-over';
+
+        // lekeler
+        for (const s of this.stains) {
+            ctx.globalAlpha = Math.max(0, s.alpha);
+            ctx.fillStyle = s.color;
+            ctx.beginPath(); ctx.arc(s.x, s.y, s.r, 0, TAU); ctx.fill();
+            for (const b of s.blobs) { ctx.beginPath(); ctx.arc(s.x + b.dx, s.y + b.dy, b.rr, 0, TAU); ctx.fill(); }
+        }
+        ctx.globalAlpha = 1;
+
+        // meyveler + yarimlar
+        for (const f of this.fruits) this.drawFruit(f, now);
+        for (const h of this.halves) this.drawHalf(h);
+
+        // suyu
+        for (const d of this.drops) {
+            ctx.globalAlpha = 1 - d.life / d.max;
+            ctx.fillStyle = d.color;
+            ctx.beginPath(); ctx.arc(d.x, d.y, d.size * (1 - d.life / d.max * 0.5), 0, TAU); ctx.fill();
+        }
+        ctx.globalAlpha = 1;
+
+        // duman
+        for (const s of this.smokes) {
+            ctx.globalAlpha = 0.32 * (1 - s.life / s.max);
+            ctx.fillStyle = '#9a9aa8';
+            ctx.beginPath(); ctx.arc(s.x, s.y, s.r, 0, TAU); ctx.fill();
+        }
+        ctx.globalAlpha = 1;
+
+        /* ---- parlak katman ---- */
+        ctx.globalCompositeOperation = 'lighter';
+
+        // kıvılcım / alev
+        for (const a of this.adds) {
+            const k = 1 - a.life / a.max;
+            ctx.globalAlpha = k;
+            ctx.fillStyle = a.color;
+            ctx.beginPath(); ctx.arc(a.x, a.y, Math.max(0.5, a.size * k), 0, TAU); ctx.fill();
+        }
+        ctx.globalAlpha = 1;
+
+        // şok dalgaları
+        for (const s of this.shocks) {
+            const k = 1 - s.life / s.max;
+            ctx.strokeStyle = s.color;
+            ctx.globalAlpha = k * 0.9;
+            ctx.lineWidth = Math.max(1, s.w * k);
+            ctx.beginPath(); ctx.arc(s.x, s.y, s.r, 0, TAU); ctx.stroke();
+        }
+        ctx.globalAlpha = 1;
+
+        // kesim çizgileri
+        for (const c of this.cuts) {
+            const k = 1 - c.t / c.max;
+            ctx.strokeStyle = 'rgba(255,255,255,' + (k * 0.95).toFixed(3) + ')';
+            ctx.lineWidth = 1 + 5 * k;
+            ctx.shadowColor = '#8ff'; ctx.shadowBlur = 16;
+            ctx.beginPath(); ctx.moveTo(c.x1, c.y1); ctx.lineTo(c.x2, c.y2); ctx.stroke();
+            ctx.shadowBlur = 0;
+        }
+
+        // kılıç izleri
+        for (const tr of this.trails.values()) {
+            const pts = tr.pts;
+            if (pts.length < 2) continue;
+            for (let pass = 0; pass < 2; pass++) {
+                for (let i = 1; i < pts.length; i++) {
+                    const p0 = pts[i - 1], p1 = pts[i];
+                    const age = (now - p1.t) / TRAIL_MS;
+                    const a = Math.max(0, 1 - age);
+                    const w = (pass === 0 ? 22 : 9) * a * (i / pts.length);
+                    ctx.strokeStyle = pass === 0 ? 'rgba(110,230,255,' + (a * 0.30).toFixed(3) + ')'
+                                                  : 'rgba(255,255,255,' + (a * 0.85).toFixed(3) + ')';
+                    ctx.lineWidth = Math.max(0.5, w);
+                    ctx.lineCap = 'round';
+                    ctx.beginPath(); ctx.moveTo(p0.x, p0.y); ctx.lineTo(p1.x, p1.y); ctx.stroke();
+                }
+            }
+            const tip = pts[pts.length - 1];
+            ctx.fillStyle = 'rgba(255,255,255,0.9)';
+            ctx.beginPath(); ctx.arc(tip.x, tip.y, 3.5, 0, TAU); ctx.fill();
+        }
+
+        ctx.globalCompositeOperation = 'source-over';
+
+        // puan baloncukları
+        ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        for (const p of this.pops) {
+            const a = 1 - p.t / 0.9;
+            ctx.globalAlpha = a;
+            ctx.font = 'bold 17px Arial';
+            ctx.fillStyle = p.color;
+            ctx.fillText(p.txt, p.x, p.y);
+        }
+        ctx.globalAlpha = 1;
+
+        // kombo / seviye bandı
+        if (this.comboBanner) {
+            const t = this.comboBanner.t;
+            const s = 1 + 0.8 * Math.max(0, 1 - t / 0.16);
+            const a = t < 0.55 ? 1 : 1 - (t - 0.55) / 0.4;
+            ctx.save();
+            ctx.translate(W / 2, H * 0.33);
+            ctx.scale(s, s);
+            ctx.globalAlpha = Math.max(0, a);
+            ctx.font = 'bold ' + Math.round(Math.min(W, H) * 0.105) + 'px Arial';
+            ctx.shadowColor = this.comboBanner.color; ctx.shadowBlur = 28;
+            ctx.fillStyle = '#fff';
+            ctx.fillText(this.comboBanner.txt, 0, 0);
+            ctx.restore();
+            ctx.globalAlpha = 1; ctx.shadowBlur = 0;
+        }
+        if (this.levelBanner) {
+            const t = this.levelBanner.t;
+            const a = t < 0.7 ? 1 : 1 - (t - 0.7) / 0.4;
+            ctx.globalAlpha = Math.max(0, a);
+            ctx.font = 'bold ' + Math.round(Math.min(W, H) * 0.055) + 'px Arial';
+            ctx.shadowColor = '#ffd60a'; ctx.shadowBlur = 20;
+            ctx.fillStyle = '#ffd60a';
+            ctx.fillText(this.levelBanner.txt, W / 2, H * 0.43);
+            ctx.shadowBlur = 0; ctx.globalAlpha = 1;
+        }
+
+        // HUD
+        if (this.state === 'playing' || this.state === 'dying' || this.state === 'paused') {
+            ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
+            ctx.font = 'bold 12px Arial';
+            ctx.fillStyle = 'rgba(255,255,255,0.55)';
+            ctx.fillText('PUAN', 20, 32);
+            const hs = 1 + 0.25 * this.hudP * this.hudP;
+            ctx.save();
+            ctx.translate(20, 66); ctx.scale(hs, hs);
+            ctx.font = 'bold 36px Arial';
+            ctx.shadowColor = '#6ff'; ctx.shadowBlur = 14;
+            ctx.fillStyle = '#fff';
+            ctx.fillText(String(this.score), 0, 0);
+            ctx.restore();
+            ctx.shadowBlur = 0;
+            for (let i = 0; i < 3; i++) this.drawHeart(30 + i * 30, 86, 11, i < this.lives);
+        }
+
+        ctx.restore(); // shake
+
+        // kaçırma çerçevesi
+        if (this.missFlash > 0) {
+            ctx.save();
+            ctx.globalAlpha = this.missFlash * 0.8;
+            ctx.strokeStyle = '#ff3b4d';
+            ctx.lineWidth = 16;
+            ctx.shadowColor = '#ff3b4d'; ctx.shadowBlur = 32;
+            ctx.strokeRect(8, 8, W - 16, H - 16);
+            ctx.restore();
+        }
+
+        // patlama flaşı
+        if (this.flash > 0) {
+            ctx.fillStyle = 'rgba(255,236,215,' + (this.flash * 0.85).toFixed(3) + ')';
+            ctx.fillRect(0, 0, W, H);
+            ctx.fillStyle = 'rgba(255,80,40,' + (this.flash * 0.3).toFixed(3) + ')';
+            ctx.fillRect(0, 0, W, H);
+        }
+    }
+
+    loop(t) {
+        const dt = Math.min((t - this.last) / 1000, 0.05);
+        this.last = t;
+        if (this.state !== 'paused') this.update(dt);
+        this.render();
+        requestAnimationFrame(tt => this.loop(tt));
+    }
+}
+
+window.addEventListener('load', () => { window.game = new Game(); });
+</script>
+</body>
+</html>

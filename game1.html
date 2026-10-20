@@ -1,0 +1,1086 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Ceotherm Bounce Game</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            -webkit-user-select: none;
+            user-select: none;
+        }
+
+        body {
+            background: linear-gradient(145deg, #0a1628, #0d2137, #132d46);
+            overflow: hidden;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            height: 100vh;
+            width: 100vw;
+            touch-action: none;
+        }
+
+        /* ===== CANVAS ===== */
+        canvas {
+            display: block;
+        }
+        .paddle-style {
+            background: white;
+        }
+        /* ===== START EKRANI ===== */
+        .overlay {
+            position: fixed;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            background: radial-gradient(ellipse at 50% 30%, rgba(255,140,50,0.08) 0%, rgba(10,22,40,0.99) 70%);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 100;
+            transition: opacity 0.5s ease;
+            overflow: hidden;
+        }
+
+        .overlay.hidden {
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        /* Arkaplan partikülleri */
+        .start-particles {
+            position: absolute;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            overflow: hidden;
+            z-index: 0;
+        }
+
+        .s-particle {
+            position: absolute;
+            border-radius: 50%;
+            animation: particleFloat 6s ease-in-out infinite;
+        }
+
+        .s-particle:nth-child(1) { width: 4px; height: 4px; background: #00ff88; top: 15%; left: 10%; animation-delay: 0s; }
+        .s-particle:nth-child(2) { width: 6px; height: 6px; background: #FF8C32; top: 25%; right: 15%; animation-delay: -1s; }
+        .s-particle:nth-child(3) { width: 3px; height: 3px; background: #7832ff; top: 60%; left: 20%; animation-delay: -2s; }
+        .s-particle:nth-child(4) { width: 5px; height: 5px; background: #00ddff; top: 70%; right: 25%; animation-delay: -3s; }
+        .s-particle:nth-child(5) { width: 4px; height: 4px; background: #ff3264; top: 40%; left: 80%; animation-delay: -4s; }
+        .s-particle:nth-child(6) { width: 7px; height: 7px; background: #ffaa00; top: 80%; left: 50%; animation-delay: -1.5s; }
+        .s-particle:nth-child(7) { width: 3px; height: 3px; background: #00ff88; top: 10%; left: 60%; animation-delay: -2.5s; }
+        .s-particle:nth-child(8) { width: 5px; height: 5px; background: #e040fb; top: 50%; left: 5%; animation-delay: -3.5s; }
+
+        @keyframes particleFloat {
+            0%, 100% { transform: translate(0, 0) scale(1); opacity: 0.4; }
+            25% { transform: translate(20px, -30px) scale(1.5); opacity: 0.8; }
+            50% { transform: translate(-15px, 15px) scale(0.8); opacity: 0.3; }
+            75% { transform: translate(25px, 20px) scale(1.3); opacity: 0.7; }
+        }
+
+        /* Dönen halka */
+        .orbit-ring {
+            position: absolute;
+            width: 280px;
+            height: 280px;
+            border: 1px solid rgba(255,140,50,0.06);
+            border-radius: 50%;
+            animation: orbitSpin 20s linear infinite;
+        }
+
+        .orbit-ring::after {
+            content: '🏀';
+            position: absolute;
+            top: -12px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 20px;
+        }
+
+        .orbit-ring-2 {
+            position: absolute;
+            width: 340px;
+            height: 340px;
+            border: 1px dashed rgba(255,255,255,0.03);
+            border-radius: 50%;
+            animation: orbitSpin 30s linear infinite reverse;
+        }
+
+        @keyframes orbitSpin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+
+        /* Start içerik */
+        .start-content {
+            position: relative;
+            z-index: 2;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        /* Basketbol emoji animasyonu */
+        .bounce-emoji {
+            font-size: 60px;
+            animation: emojiBounce 1.5s ease-in-out infinite;
+            margin-bottom: 15px;
+            filter: drop-shadow(0 10px 20px rgba(255,140,50,0.3));
+        }
+
+        @keyframes emojiBounce {
+            0%, 100% { transform: translateY(0) rotate(0deg); }
+            30% { transform: translateY(-25px) rotate(-10deg); }
+            50% { transform: translateY(-30px) rotate(5deg); }
+            70% { transform: translateY(-20px) rotate(-5deg); }
+        }
+
+        /* CEO yazısı */
+        .title-ceo {
+            font-size: 18px;
+            font-weight: 800;
+            letter-spacing: 10px;
+            text-transform: uppercase;
+            margin-bottom: 2px;
+            background: linear-gradient(90deg, #FF8C32, #ffcc00, #FF8C32);
+            background-size: 200% auto;
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            animation: shimmer 3s linear infinite;
+        }
+
+        @keyframes shimmer {
+            0% { background-position: 0% center; }
+            100% { background-position: 200% center; }
+        }
+
+        /* BOUNCE ana başlık */
+        .title-bounce {
+            font-size: 52px;
+            font-weight: 900;
+            line-height: 1;
+            margin-bottom: 12px;
+            position: relative;
+        }
+
+        .title-bounce .char {
+            display: inline-block;
+            animation: charWave 2s ease-in-out infinite;
+        }
+
+        .title-bounce .char:nth-child(1) { color: #FF8C32; animation-delay: 0s; }
+        .title-bounce .char:nth-child(2) { color: #ffaa00; animation-delay: 0.08s; }
+        .title-bounce .char:nth-child(3) { color: #00ff88; animation-delay: 0.16s; }
+        .title-bounce .char:nth-child(4) { color: #00ddff; animation-delay: 0.24s; }
+        .title-bounce .char:nth-child(5) { color: #7832ff; animation-delay: 0.32s; }
+        .title-bounce .char:nth-child(6) { color: #ff3264; animation-delay: 0.4s; }
+
+        @keyframes charWave {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-8px); }
+        }
+
+        /* Alt açıklama */
+        .game-desc {
+            color: rgba(255,255,255,0.35);
+            font-size: 13px;
+            text-align: center;
+            line-height: 1.8;
+            margin-bottom: 10px;
+            max-width: 260px;
+        }
+
+        .game-desc .highlight {
+            color: #FF8C32;
+            font-weight: 700;
+        }
+
+        /* Skor bilgisi */
+        .best-score-display {
+            background: rgba(255,255,255,0.04);
+            border: 1px solid rgba(255,255,255,0.06);
+            border-radius: 12px;
+            padding: 8px 20px;
+            margin-bottom: 25px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .best-score-display i {
+            color: #ffaa00;
+            font-size: 14px;
+        }
+
+        .best-score-display span {
+            color: rgba(255,255,255,0.4);
+            font-size: 12px;
+        }
+
+        .best-score-display strong {
+            color: #ffaa00;
+            font-size: 16px;
+        }
+
+        /* PLAY butonu */
+        .play-btn {
+            width: 90px;
+            height: 90px;
+            border-radius: 50%;
+            border: none;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 36px;
+            color: #0a1628;
+            transition: all 0.3s ease;
+            position: relative;
+            z-index: 2;
+            background: linear-gradient(135deg, #FF8C32, #E67320, #ffaa00);
+            box-shadow:
+                0 0 30px rgba(255,140,50,0.3),
+                0 0 60px rgba(255,140,50,0.15),
+                inset 0 -3px 6px rgba(0,0,0,0.15);
+            animation: playPulse 2s ease-in-out infinite;
+        }
+
+        .play-btn::before {
+            content: '';
+            position: absolute;
+            width: 110px;
+            height: 110px;
+            border-radius: 50%;
+            border: 2px solid rgba(255,140,50,0.2);
+            animation: playRing 2s ease-in-out infinite;
+        }
+
+        .play-btn::after {
+            content: '';
+            position: absolute;
+            width: 130px;
+            height: 130px;
+            border-radius: 50%;
+            border: 1px solid rgba(255,140,50,0.1);
+            animation: playRing 2s ease-in-out infinite 0.3s;
+        }
+
+        .play-btn:hover {
+            transform: scale(1.12);
+            box-shadow:
+                0 0 40px rgba(255,140,50,0.5),
+                0 0 80px rgba(255,140,50,0.2);
+        }
+
+        .play-btn:active {
+            transform: scale(0.95);
+        }
+
+        @keyframes playPulse {
+            0%, 100% { box-shadow: 0 0 30px rgba(255,140,50,0.3), 0 0 60px rgba(255,140,50,0.15); }
+            50% { box-shadow: 0 0 50px rgba(255,140,50,0.5), 0 0 100px rgba(255,140,50,0.2); }
+        }
+
+        @keyframes playRing {
+            0%, 100% { transform: scale(1); opacity: 0.5; }
+            50% { transform: scale(1.1); opacity: 0.2; }
+        }
+
+        .play-label {
+            color: rgba(255,255,255,0.2);
+            font-size: 11px;
+            margin-top: 18px;
+            letter-spacing: 4px;
+            text-transform: uppercase;
+            animation: labelBlink 2s ease-in-out infinite;
+        }
+
+        @keyframes labelBlink {
+            0%, 100% { opacity: 0.3; }
+            50% { opacity: 0.7; }
+        }
+
+        /* Kural ikonları */
+        .rules-row {
+            display: flex;
+            gap: 25px;
+            margin-bottom: 25px;
+        }
+
+        .rule-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .rule-icon {
+            width: 40px;
+            height: 40px;
+            border-radius: 12px;
+            background: rgba(255,255,255,0.04);
+            border: 1px solid rgba(255,255,255,0.06);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+        }
+
+        .rule-text {
+            color: rgba(255,255,255,0.25);
+            font-size: 9px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            font-weight: 600;
+        }
+       
+        /* ===== SKOR ===== */
+        .score-display {
+            position: fixed;
+            top: 15px;
+            right: 15px;
+            background: rgba(255,140,50,0.15);
+            border: 1px solid rgba(255,140,50,0.25);
+            border-radius: 12px;
+            padding: 8px 16px;
+            z-index: 50;
+            display: none;
+        }
+
+        .score-display.show {
+            display: block;
+        }
+
+        .score-label {
+            color: rgba(255,255,255,0.4);
+            font-size: 9px;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+
+        .score-value {
+            color: #FF8C32;
+            font-size: 28px;
+            font-weight: 900;
+        }
+
+        /* ===== GAME OVER EKRANI ===== */
+        .gameover-overlay {
+            position: fixed;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            background: rgba(10, 22, 40, 0.95);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 200;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.5s ease;
+        }
+
+        .gameover-overlay.show {
+            opacity: 1;
+            pointer-events: all;
+        }
+
+        .fired-photo {
+            width: 100px;
+            height: 100px;
+            border-radius: 50%;
+            object-fit: cover;
+            border: 4px solid #e74c3c;
+            margin-bottom: 15px;
+            box-shadow: 0 0 30px rgba(231,76,60,0.4);
+        }
+
+        .fired-photo-placeholder {
+            width: 100px;
+            height: 100px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 36px;
+            font-weight: 800;
+            color: white;
+            border: 4px solid #e74c3c;
+            margin-bottom: 15px;
+            box-shadow: 0 0 30px rgba(231,76,60,0.4);
+        }
+
+        .fired-text {
+            color: #e74c3c;
+            font-size: 24px;
+            font-weight: 800;
+            text-align: center;
+            margin-bottom: 5px;
+        }
+
+        .fired-name {
+            color: #fff;
+            font-size: 20px;
+            font-weight: 700;
+            margin-bottom: 5px;
+        }
+
+        .fired-label {
+            color: #e74c3c;
+            font-size: 16px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 3px;
+            margin-bottom: 8px;
+        }
+
+        .final-score {
+            color: rgba(255,255,255,0.4);
+            font-size: 14px;
+            margin-bottom: 30px;
+        }
+
+        .final-score span {
+            color: #FF8C32;
+            font-weight: 800;
+            font-size: 22px;
+        }
+
+        .gameover-buttons {
+            display: flex;
+            gap: 12px;
+        }
+
+        .gameover-btn {
+            padding: 14px 28px;
+            border-radius: 14px;
+            border: none;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 700;
+            transition: all 0.3s ease;
+            text-decoration: none;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .gameover-btn:hover {
+            transform: translateY(-2px);
+        }
+
+        .btn-restart {
+            background: linear-gradient(135deg, #FF8C32, #E67320);
+            color: #0a1628;
+            box-shadow: 0 8px 25px rgba(255,140,50,0.3);
+        }
+
+        .btn-back {
+            background: rgba(255,255,255,0.08);
+            color: #fff;
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+
+        .btn-back:hover {
+            background: rgba(255,255,255,0.12);
+        }
+
+        /* ===== INSTRUCTIONS ===== */
+        .instructions {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            color: rgba(255,255,255,0.2);
+            font-size: 11px;
+            text-align: center;
+            z-index: 50;
+            display: none;
+            letter-spacing: 1px;
+        }
+
+        .instructions.show {
+            display: block;
+        }
+    </style>
+</head>
+<body>
+
+<!-- OYUN CANVAS -->
+<canvas id="gameCanvas"></canvas>
+
+<!-- SKOR -->
+<div class="score-display" id="scoreDisplay">
+    <div class="score-label">Score</div>
+    <div class="score-value" id="scoreValue">0</div>
+</div>
+
+<!-- TALİMAT -->
+<div class="instructions" id="instructions">
+    ← Slide the logo to bounce employees →
+</div>
+
+<!-- START EKRANI -->
+<div class="overlay" id="startScreen">
+
+    <!-- Arkaplan efektleri -->
+    <div class="start-particles">
+        <div class="s-particle"></div>
+        <div class="s-particle"></div>
+        <div class="s-particle"></div>
+        <div class="s-particle"></div>
+        <div class="s-particle"></div>
+        <div class="s-particle"></div>
+        <div class="s-particle"></div>
+        <div class="s-particle"></div>
+    </div>
+    <div class="orbit-ring"></div>
+    <div class="orbit-ring-2"></div>
+
+    <!-- İçerik -->
+    <div class="start-content">
+
+        <div class="bounce-emoji">🏀</div>
+
+        <div class="title-ceo">C E O</div>
+
+        <div class="title-bounce">
+            <span class="char">H</span>
+            <span class="char">O</span>
+            <span class="char">P</span>
+            <span class="char">L</span>
+            <span class="char">A</span>
+            <span class="char">T</span>
+        </div>
+
+        <div class="game-desc">
+            Hoplat ve <span class="highlight">KOVULACAK ÇALIŞANLARI</span> kurtar.<br>
+            Unutma bir gün sende kovulabilirsin!
+        </div>
+
+        <div class="rules-row">
+            <div class="rule-item">
+                <div class="rule-icon">👆</div>
+                <span class="rule-text">Kaydır</span>
+            </div>
+            <div class="rule-item">
+                <div class="rule-icon">🏀</div>
+                <span class="rule-text">Zıplat</span>
+            </div>
+            <div class="rule-item">
+                <div class="rule-icon">⭐</div>
+                <span class="rule-text">Skor Kap</span>
+            </div>
+        </div>
+
+        <div class="best-score-display">
+            <i class="fas fa-trophy"></i>
+            <span>Best:</span>
+            <strong id="bestScore">0</strong>
+        </div>
+
+        <button class="play-btn" onclick="startGame()">
+            <i class="fas fa-play" style="margin-left:5px"></i>
+        </button>
+
+        <div class="play-label">Tap to Play</div>
+
+    </div>
+</div>
+
+<!-- GAME OVER EKRANI -->
+<div class="gameover-overlay" id="gameoverScreen">
+    <div id="firedPhotoContainer"></div>
+    <div class="fired-name" id="firedName"></div>
+    <div class="fired-label">🔥 KOVULDU! 🔥</div>
+    <div class="final-score">Final Score: <span id="finalScore">0</span></div>
+    <div class="gameover-buttons">
+        <button class="gameover-btn btn-restart" onclick="restartGame()">
+            <i class="fas fa-redo"></i> Play Again
+        </button>
+        <a href="gamemenu.html" class="gameover-btn btn-back">
+            <i class="fas fa-arrow-left"></i> Go Back
+        </a>
+    </div>
+</div>
+
+<script>
+    // Best Score
+    let bestScore = localStorage.getItem('ceoBouncesBest') || 0;
+    document.getElementById('bestScore').textContent = bestScore;
+    // ==========================================
+    // OYUN DEĞİŞKENLERİ
+    // ==========================================
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+
+    window.addEventListener('resize', () => {
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+        if (paddle) {
+            paddle.y = canvas.height - 150;
+            paddle.x = canvas.width / 2 - paddle.width / 2;
+        }
+    });
+
+    // Kişi bilgileri
+    const persons = [
+        { id: 1, name: 'CENK BEY', initials: 'CY', title: 'General Manager', color: '#FF8C32', img: null },
+        { id: 2, name: 'DİLARA HANIM', initials: 'DE', title: 'Sales Manager', color: '#1a3a5c', img: null },
+        { id: 3, name: 'VOLKAN BEY', initials: 'VE', title: 'Purchasing Manager', color: '#0077b5', img: null },
+        { id: 4, name: 'ORHAN BABA', initials: 'OK', title: 'Automation Manager', color: '#d35400', img: null },
+        { id: 5, name: 'MAHMUT HOCA', initials: 'MY', title: 'Project Manager', color: '#132d46', img: null }
+    ];
+
+    // Resimleri yüklemeyi dene
+    persons.forEach((p, i) => {
+        const img = new Image();
+        img.src = `images/person${i + 1}.png`;
+        img.onload = () => { p.img = img; };
+    });
+
+    // Logo resmi
+    let logoImg = null;
+    const logoImgObj = new Image();
+    logoImgObj.src = 'images/logo.png';
+    logoImgObj.onload = () => { logoImg = logoImgObj; };
+
+    // Oyun durumu
+    let gameRunning = false;
+    let score = 0;
+    let balls = [];
+    let paddle = null;
+    let animationId = null;
+    let spawnTimer = 0;
+    let spawnInterval = 120; // frame sayısı
+    let difficulty = 0;
+    let frameCount = 0;
+
+    // Paddle (Logo)
+        function createPaddle() {
+        const pw = Math.min(canvas.width * 0.22, 100);
+        const ph = pw * 0.45;
+        return {
+            x: canvas.width / 2 - pw / 2,
+            y: canvas.height - 150,
+            width: pw,
+            height: ph,
+            targetX: canvas.width / 2 - pw / 2
+        };
+    }
+
+    // Top oluştur
+    function createBall() {
+        const person = persons[Math.floor(Math.random() * persons.length)];
+        const radius = Math.min(canvas.width * 0.06, 28);
+        const x = radius + Math.random() * (canvas.width - radius * 2);
+        const baseSpeed = 1.5 + difficulty * 0.3;
+        const speed = baseSpeed + Math.random() * 1;
+
+        return {
+            x: x,
+            y: -radius * 2,
+            radius: radius,
+            vx: (Math.random() - 0.5) * 2,
+            vy: speed,
+            person: person,
+            bounced: false,
+            active: true,
+            bounceAnim: 0,
+            gravity: 0.04 + difficulty * 0.005
+        };
+    }
+
+    // ==========================================
+    // ÇİZİM FONKSİYONLARI
+    // ==========================================
+
+        function drawPaddle() {
+        const p = paddle;
+        const r = 10;
+
+        ctx.save();
+
+        // Beyaz arka plan
+        ctx.beginPath();
+        ctx.moveTo(p.x + r, p.y);
+        ctx.lineTo(p.x + p.width - r, p.y);
+        ctx.quadraticCurveTo(p.x + p.width, p.y, p.x + p.width, p.y + r);
+        ctx.lineTo(p.x + p.width, p.y + p.height - r);
+        ctx.quadraticCurveTo(p.x + p.width, p.y + p.height, p.x + p.width - r, p.y + p.height);
+        ctx.lineTo(p.x + r, p.y + p.height);
+        ctx.quadraticCurveTo(p.x, p.y + p.height, p.x, p.y + p.height - r);
+        ctx.lineTo(p.x, p.y + r);
+        ctx.quadraticCurveTo(p.x, p.y, p.x + r, p.y);
+        ctx.closePath();
+
+        ctx.fillStyle = '#ffffff';
+        ctx.fill();
+
+        // Hafif gölge
+        ctx.shadowColor = 'rgba(255,255,255,0.3)';
+        ctx.shadowBlur = 12;
+        ctx.fill();
+        ctx.shadowBlur = 0;
+
+        // İnce border
+        ctx.strokeStyle = 'rgba(255,140,50,0.3)';
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+
+        // Logo resmi veya yazı
+        if (logoImg) {
+            const padding = 4;
+            ctx.drawImage(logoImg, p.x + padding, p.y + padding, p.width - padding * 2, p.height - padding * 2);
+        } else {
+            ctx.fillStyle = '#FF8C32';
+            ctx.font = 'bold ' + Math.floor(p.width * 0.13) + 'px Segoe UI';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText('CEOTHERM', p.x + p.width / 2, p.y + p.height / 2);
+        }
+
+        ctx.restore();
+    }
+
+    function drawBall(ball) {
+        ctx.save();
+
+        const scale = ball.bounceAnim > 0 ? 1 + ball.bounceAnim * 0.3 : 1;
+
+        // Glow efekti
+        ctx.shadowColor = ball.person.color;
+        ctx.shadowBlur = 10;
+
+        // Daire
+        ctx.beginPath();
+        ctx.arc(ball.x, ball.y, ball.radius * scale, 0, Math.PI * 2);
+
+        if (ball.person.img) {
+            ctx.closePath();
+            ctx.clip();
+            ctx.drawImage(
+                ball.person.img,
+                ball.x - ball.radius * scale,
+                ball.y - ball.radius * scale,
+                ball.radius * 2 * scale,
+                ball.radius * 2 * scale
+            );
+        } else {
+            const grad = ctx.createRadialGradient(
+                ball.x - ball.radius * 0.3, ball.y - ball.radius * 0.3, ball.radius * 0.1,
+                ball.x, ball.y, ball.radius * scale
+            );
+            grad.addColorStop(0, ball.person.color);
+            grad.addColorStop(1, shadeColor(ball.person.color, -30));
+            ctx.fillStyle = grad;
+            ctx.fill();
+
+            // Initials
+            ctx.shadowBlur = 0;
+            ctx.fillStyle = '#fff';
+            ctx.font = 'bold ' + Math.floor(ball.radius * 0.7) + 'px Segoe UI';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(ball.person.initials, ball.x, ball.y);
+        }
+
+        // Border
+        ctx.beginPath();
+        ctx.arc(ball.x, ball.y, ball.radius * scale, 0, Math.PI * 2);
+        ctx.strokeStyle = 'rgba(255,255,255,0.2)';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+
+        ctx.restore();
+    }
+
+    function shadeColor(color, percent) {
+        const num = parseInt(color.replace('#', ''), 16);
+        const amt = Math.round(2.55 * percent);
+        const R = Math.max(0, Math.min(255, (num >> 16) + amt));
+        const G = Math.max(0, Math.min(255, (num >> 8 & 0x00FF) + amt));
+        const B = Math.max(0, Math.min(255, (num & 0x0000FF) + amt));
+        return '#' + (0x1000000 + R * 0x10000 + G * 0x100 + B).toString(16).slice(1);
+    }
+
+    // Arkaplan partikülleri
+    let particles = [];
+
+    function createParticles() {
+        for (let i = 0; i < 30; i++) {
+            particles.push({
+                x: Math.random() * canvas.width,
+                y: Math.random() * canvas.height,
+                r: Math.random() * 2 + 0.5,
+                vx: (Math.random() - 0.5) * 0.3,
+                vy: Math.random() * 0.3 + 0.1,
+                alpha: Math.random() * 0.3 + 0.05
+            });
+        }
+    }
+
+    function drawParticles() {
+        particles.forEach(p => {
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+            ctx.fillStyle = `rgba(255,140,50,${p.alpha})`;
+            ctx.fill();
+
+            p.x += p.vx;
+            p.y += p.vy;
+
+            if (p.y > canvas.height + 10) {
+                p.y = -10;
+                p.x = Math.random() * canvas.width;
+            }
+            if (p.x < -10) p.x = canvas.width + 10;
+            if (p.x > canvas.width + 10) p.x = -10;
+        });
+    }
+
+    // ==========================================
+    // FİZİK & ÇARPIŞMA
+    // ==========================================
+
+    function updateBalls() {
+        balls.forEach(ball => {
+            if (!ball.active) return;
+
+            ball.vy += ball.gravity;
+            ball.x += ball.vx;
+            ball.y += ball.vy;
+
+            // Bounce animation azalt
+            if (ball.bounceAnim > 0) {
+                ball.bounceAnim -= 0.05;
+            }
+
+            // Duvar çarpması
+            if (ball.x - ball.radius < 0) {
+                ball.x = ball.radius;
+                ball.vx *= -0.8;
+            }
+            if (ball.x + ball.radius > canvas.width) {
+                ball.x = canvas.width - ball.radius;
+                ball.vx *= -0.8;
+            }
+
+            // Tavan çarpması
+            if (ball.y - ball.radius < 0) {
+                ball.y = ball.radius;
+                ball.vy *= -0.6;
+            }
+
+            // Paddle çarpışma
+            if (
+                ball.vy > 0 &&
+                ball.y + ball.radius >= paddle.y &&
+                ball.y + ball.radius <= paddle.y + paddle.height + 10 &&
+                ball.x >= paddle.x - ball.radius &&
+                ball.x <= paddle.x + paddle.width + ball.radius
+            ) {
+                // Sekme açısı (paddle'ın neresine çarptı)
+                const hitPos = (ball.x - paddle.x) / paddle.width;
+                const angle = (hitPos - 0.5) * 2.5;
+
+                const speed = Math.sqrt(ball.vx * ball.vx + ball.vy * ball.vy);
+                const bounceSpeed = Math.max(speed * 0.85, 4);
+
+                ball.vy = -bounceSpeed;
+                ball.vx = angle * bounceSpeed * 0.7;
+                ball.y = paddle.y - ball.radius;
+                ball.bounceAnim = 1;
+
+                if (!ball.bounced) {
+                    ball.bounced = true;
+                    score++;
+                    document.getElementById('scoreValue').textContent = score;
+                }
+            }
+
+            // Aşağı düştü - GAME OVER
+            if (ball.y - ball.radius > canvas.height) {
+                ball.active = false;
+                gameOver(ball.person);
+            }
+        });
+
+        // Aktif olmayan topları temizle
+        balls = balls.filter(b => b.active);
+    }
+
+    function spawnBall() {
+        spawnTimer++;
+        if (spawnTimer >= spawnInterval) {
+            balls.push(createBall());
+            spawnTimer = 0;
+        }
+    }
+
+    // ==========================================
+    // PADDLE KONTROLÜ
+    // ==========================================
+
+    let dragging = false;
+    let dragOffsetX = 0;
+
+    // Mouse
+    canvas.addEventListener('mousedown', (e) => {
+        if (!gameRunning) return;
+        dragging = true;
+        dragOffsetX = e.clientX - paddle.x;
+    });
+
+    canvas.addEventListener('mousemove', (e) => {
+        if (!gameRunning || !dragging) return;
+        let newX = e.clientX - dragOffsetX;
+        newX = Math.max(0, Math.min(canvas.width - paddle.width, newX));
+        paddle.x = newX;
+    });
+
+    canvas.addEventListener('mouseup', () => { dragging = false; });
+
+    // Touch
+    canvas.addEventListener('touchstart', (e) => {
+        if (!gameRunning) return;
+        e.preventDefault();
+        const touch = e.touches[0];
+        dragging = true;
+        dragOffsetX = touch.clientX - paddle.x;
+    }, { passive: false });
+
+    canvas.addEventListener('touchmove', (e) => {
+        if (!gameRunning) return;
+        e.preventDefault();
+        const touch = e.touches[0];
+        let newX = touch.clientX - dragOffsetX;
+        newX = Math.max(0, Math.min(canvas.width - paddle.width, newX));
+        paddle.x = newX;
+    }, { passive: false });
+
+    canvas.addEventListener('touchend', () => { dragging = false; });
+
+    // ==========================================
+    // OYUN DÖNGÜSÜ
+    // ==========================================
+
+    function gameLoop() {
+        if (!gameRunning) return;
+
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        // Arkaplan gradient
+        const bgGrad = ctx.createLinearGradient(0, 0, 0, canvas.height);
+        bgGrad.addColorStop(0, '#0a1628');
+        bgGrad.addColorStop(0.5, '#0d2137');
+        bgGrad.addColorStop(1, '#132d46');
+        ctx.fillStyle = bgGrad;
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        // Partiküller
+        drawParticles();
+
+        // Zorluk artışı
+        frameCount++;
+        if (frameCount % 600 === 0) {
+            difficulty++;
+            if (spawnInterval > 50) spawnInterval -= 8;
+        }
+
+        // Topları spawn ve güncelle
+        spawnBall();
+        updateBalls();
+
+        // Çiz
+        balls.forEach(b => { if (b.active) drawBall(b); });
+        drawPaddle();
+
+        // Alt çizgi (zemin)
+        ctx.beginPath();
+        ctx.moveTo(0, canvas.height - 10);
+        ctx.lineTo(canvas.width, canvas.height - 10);
+        ctx.strokeStyle = 'rgba(255,140,50,0.1)';
+        ctx.lineWidth = 1;
+        ctx.stroke();
+
+        animationId = requestAnimationFrame(gameLoop);
+    }
+
+    // ==========================================
+    // OYUN KONTROL
+    // ==========================================
+
+    function startGame() {
+        document.getElementById('startScreen').classList.add('hidden');
+        document.getElementById('scoreDisplay').classList.add('show');
+        document.getElementById('instructions').classList.add('show');
+
+        score = 0;
+        balls = [];
+        difficulty = 0;
+        spawnInterval = 120;
+        spawnTimer = 0;
+        frameCount = 0;
+        document.getElementById('scoreValue').textContent = '0';
+
+        paddle = createPaddle();
+        createParticles();
+
+        gameRunning = true;
+
+        // Talimatı 3 sn sonra gizle
+        setTimeout(() => {
+            document.getElementById('instructions').classList.remove('show');
+        }, 3000);
+
+        gameLoop();
+    }
+
+    function gameOver(person) {
+        gameRunning = false;
+        cancelAnimationFrame(animationId);
+
+        // Bilgileri doldur
+        const photoContainer = document.getElementById('firedPhotoContainer');
+
+        if (person.img) {
+            photoContainer.innerHTML = `<img src="images/person${person.id}.png" class="fired-photo" alt="${person.name}">`;
+        } else {
+            photoContainer.innerHTML = `
+                <div class="fired-photo-placeholder" style="background: linear-gradient(135deg, ${person.color}, ${shadeColor(person.color, -20)})">
+                    ${person.initials}
+                </div>`;
+        }
+
+        document.getElementById('firedName').textContent = person.name;
+        document.getElementById('finalScore').textContent = score;
+        // Best score güncelle
+        if (score > bestScore) {
+            bestScore = score;
+            localStorage.setItem('ceoBouncesBest', bestScore);
+        }
+        document.getElementById('bestScore').textContent = bestScore;
+        // Ekranı göster
+        setTimeout(() => {
+            document.getElementById('gameoverScreen').classList.add('show');
+        }, 300);
+    }
+
+    function restartGame() {
+        document.getElementById('gameoverScreen').classList.remove('show');
+        setTimeout(() => {
+            startGame();
+        }, 400);
+    }
+</script>
+
+</body>
+</html>

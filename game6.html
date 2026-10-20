@@ -1,0 +1,869 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Otoyol Macerası - Pro</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            user-select: none;
+            -webkit-user-select: none;
+            touch-action: none;
+        }
+
+        body {
+            background-color: #050b14;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            overflow: hidden;
+            width: 100vw;
+            height: 100dvh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: #fff;
+        }
+
+        #gameContainer {
+            position: relative;
+            width: 100%;
+            max-width: 480px;
+            height: 100dvh;
+            background: #111;
+            overflow: hidden;
+            box-shadow: 0 0 40px rgba(0,0,0,1);
+        }
+
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+            z-index: 0;
+        }
+
+        /* HUD Göstergeleri (Tamamen Pasif, Dokunmayı Asla Engellemez) */
+        .hud-card {
+            position: absolute;
+            background: rgba(10, 15, 25, 0.85);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 8px;
+            padding: 8px 12px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-width: 90px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+            pointer-events: none !important;
+            z-index: 10;
+        }
+
+        .hud-speed { top: 15px; left: 15px; }
+        .hud-timer { top: 15px; left: 50%; transform: translateX(-50%); }
+
+        .hud-label {
+            font-size: 9px;
+            color: #8fa3b0;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            font-weight: 700;
+        }
+
+        .hud-value {
+            font-size: 16px;
+            font-weight: 900;
+            color: #fff;
+            font-family: monospace;
+            text-shadow: 0 0 10px rgba(255,255,255,0.3);
+        }
+
+        .hud-value.timer {
+            color: #48bb78;
+            text-shadow: 0 0 10px rgba(72, 187, 120, 0.5);
+        }
+
+        /* Left Progress Bar */
+        .progress-container {
+            position: absolute;
+            left: 10px;
+            top: 90px;
+            bottom: 120px;
+            width: 30px;
+            z-index: 10;
+            pointer-events: none !important;
+        }
+
+        .progress-track {
+            position: absolute;
+            top: 20px;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 4px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 2px;
+        }
+
+        .progress-fill {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            height: 0%;
+            background: #48bb78;
+            border-radius: 2px;
+            box-shadow: 0 0 8px #48bb78;
+            transition: height 0.1s linear;
+        }
+
+        .progress-marker {
+            position: absolute;
+            left: 50%;
+            bottom: 0%;
+            transform: translate(-50%, 50%) rotate(-90deg);
+            font-size: 16px;
+            transition: bottom 0.1s linear;
+            filter: drop-shadow(0 0 4px rgba(0,0,0,0.9));
+        }
+
+        .highway-sign {
+            position: absolute;
+            left: 12px;
+            background: #003366;
+            border: 1.5px solid #fff;
+            border-radius: 3px;
+            color: #fff;
+            font-size: 8px;
+            font-weight: bold;
+            padding: 2px 4px;
+            white-space: nowrap;
+            transform: translateY(50%);
+            box-shadow: 2px 2px 5px rgba(0,0,0,0.6);
+        }
+
+        /* General Button Styling */
+        .btn-pro {
+            position: relative;
+            width: 100%;
+            max-width: 260px;
+            padding: 15px 20px;
+            margin: 6px 0;
+            border: none;
+            border-radius: 30px;
+            font-size: 14px;
+            font-weight: 800;
+            letter-spacing: 1px;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            text-transform: uppercase;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            text-decoration: none;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        .btn-start {
+            background: linear-gradient(90deg, #4facfe, #00f2fe);
+            color: #000;
+            box-shadow: 0 6px 20px rgba(79, 172, 254, 0.4);
+        }
+
+        .btn-start:active { transform: scale(0.96); box-shadow: 0 2px 10px rgba(79, 172, 254, 0.3); }
+        
+        .btn-green {
+            background: linear-gradient(90deg, #48bb78, #38a169);
+            color: #000;
+            box-shadow: 0 6px 20px rgba(72, 187, 120, 0.4);
+        }
+
+        .btn-green:active { transform: scale(0.96); box-shadow: 0 2px 10px rgba(72, 187, 120, 0.3); }
+
+        .btn-dark {
+            background: rgba(255,255,255,0.05);
+            color: #fff;
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+
+        /* Generic Modal (Gizliyken kesinlikle tıklanmayı engeller) */
+        .modal, .pro-menu {
+            position: absolute;
+            inset: 0;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            padding: 25px;
+            text-align: center;
+            transition: opacity 0.25s ease, visibility 0.25s ease;
+            opacity: 0;
+            visibility: hidden; /* En önemli özellik: Gizliyken tıklanmaz */
+            pointer-events: none;
+        }
+
+        .pro-menu {
+            background: linear-gradient(135deg, rgba(10, 15, 25, 0.95), rgba(2, 4, 8, 0.98));
+            backdrop-filter: blur(15px);
+            z-index: 200;
+            opacity: 1;
+            visibility: visible;
+            pointer-events: auto;
+        }
+
+        .pro-menu.hidden {
+            opacity: 0;
+            visibility: hidden;
+            pointer-events: none;
+        }
+
+        .modal {
+            background: rgba(5, 8, 15, 0.92);
+            backdrop-filter: blur(8px);
+            z-index: 100;
+        }
+
+        .modal.active {
+            opacity: 1;
+            visibility: visible;
+            pointer-events: auto;
+        }
+
+        .modal-title {
+            font-size: 28px;
+            font-weight: 900;
+            margin-bottom: 10px;
+            letter-spacing: 1px;
+        }
+
+        .game-title {
+            font-size: 38px;
+            font-weight: 900;
+            font-style: italic;
+            background: linear-gradient(to right, #00f2fe, #4facfe);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 25px;
+            letter-spacing: 2px;
+            text-shadow: 0 0 30px rgba(79, 172, 254, 0.4);
+        }
+
+        .story-box {
+            background: rgba(255, 255, 255, 0.03);
+            border-left: 4px solid #4facfe;
+            padding: 15px 20px;
+            border-radius: 0 12px 12px 0;
+            margin-bottom: 35px;
+            font-size: 14px;
+            line-height: 1.6;
+            color: #d1d5db;
+            text-align: left;
+            box-shadow: inset 0 0 20px rgba(0,0,0,0.5);
+        }
+
+        /* Controls Hint */
+        .controls-hint {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0,0,0,0.8);
+            padding: 8px 18px;
+            border-radius: 20px;
+            font-size: 11px;
+            color: #a0aec0;
+            pointer-events: none !important;
+            z-index: 10;
+            border: 1px solid rgba(255,255,255,0.15);
+            letter-spacing: 0.5px;
+        }
+
+        /* OYUN EKRANI BUTONLARI (Z-INDEX 50 ile önde ve tıklanabilir) */
+        .pause-btn, .sound-toggle {
+            position: absolute;
+            width: 38px;
+            height: 38px;
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255,255,255,0.3);
+            border-radius: 50%;
+            color: #fff;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            cursor: pointer;
+            z-index: 50; /* Canvas ve HUD'dan üstte, Modal'dan altta */
+            backdrop-filter: blur(5px);
+            pointer-events: auto !important;
+        }
+        .pause-btn { top: 15px; right: 15px; font-size: 14px; font-weight: bold; }
+        .sound-toggle { bottom: 20px; right: 15px; font-size: 18px; }
+
+    </style>
+</head>
+<body>
+
+    <div id="gameContainer">
+        <!-- Start Menu -->
+        <div class="pro-menu" id="startMenu">
+            <div class="game-title">OTOYOL MACERASI</div>
+            <div class="story-box">
+                "Çayırova'da yola çıkan <strong>Cenk abim</strong>, Tekirdağ'a müşteriye doğru yola çıkmıştır. Onun bu acımasız İstanbul trafiğinde kazasız belasız gitmesi mümkün olacak mı?<br><br>
+                Hadi şoför koltuğuna geç ve Cenk abimi müşteriye zamanında ulaştır!"
+            </div>
+            <button class="btn-pro btn-start" id="startGameBtn">MOTORU ÇALIŞTIR</button>
+            <a href="gamemenu.html" class="btn-pro btn-dark">ANA MENÜ</a>
+        </div>
+
+        <!-- Oyun Alanı -->
+        <canvas id="gameCanvas"></canvas>
+
+        <!-- Üst Göstergeler (Tıklanmaz) -->
+        <div class="hud-card hud-speed">
+            <div class="hud-label">HIZ</div>
+            <div class="hud-value" id="speedVal">0</div>
+        </div>
+        <div class="hud-card hud-timer">
+            <div class="hud-label">SÜRE</div>
+            <div class="hud-value timer" id="timeVal">00:00.0</div>
+        </div>
+
+        <!-- Sol İlerleme (Tıklanmaz) -->
+        <div class="progress-container">
+            <div class="highway-sign" style="bottom: 100%;">T.DAĞ</div>
+            <div class="progress-track" id="progTrack">
+                <div class="progress-fill" id="progressFill"></div>
+                <div class="progress-marker" id="progressMarker">🚗</div>
+            </div>
+            <div class="highway-sign" style="bottom: 0%;">Ç.OVA</div>
+        </div>
+
+        <!-- Oynanış Ekranı Butonları -->
+        <button class="pause-btn" id="pauseBtn">I I</button>
+        <button class="sound-toggle" id="soundBtn">🔊</button>
+        <div class="controls-hint">Basılı Tut: Gaz | Kaydır: Yön</div>
+
+        <!-- PAUSE MODAL -->
+        <div class="modal" id="pauseModal">
+            <div class="modal-title" style="color: #fff;">DURAKLATILDI</div>
+            <button class="btn-pro btn-start" id="resumeBtn">DEVAM ET</button>
+            <a href="gamemenu.html" class="btn-pro btn-dark">ANA MENÜ</a>
+        </div>
+
+        <!-- KAZA MODAL -->
+        <div class="modal" id="gameOverModal">
+            <div class="modal-title" style="color: #fc8181;">KAZA YAPTIN!</div>
+            <p style="color:#cbd5e0; margin-bottom: 20px; font-size: 14px;" id="crashText">Trafikte araca çarptın.</p>
+            
+            <button class="btn-pro btn-green" id="restartBtn">SON ÇIKIŞTAN DEVAM ET</button>
+            <button class="btn-pro btn-start" id="fullRestartBtn">EN BAŞTAN BAŞLA</button>
+            <a href="gamemenu.html" class="btn-pro btn-dark" style="margin-top: 10px;">ANA MENÜ</a>
+        </div>
+
+        <!-- ZAFER MODAL -->
+        <div class="modal" id="victoryModal">
+            <div class="modal-title" style="color: #68d391;">TEKİRDAĞ'A ULAŞTIN!</div>
+            <p style="color:#cbd5e0; margin-bottom: 20px; font-size: 14px;">Müşteri Cenk Abimi bekliyor!</p>
+            <div class="hud-card" style="position:relative; margin: 0 auto 20px auto; width: 100%; max-width: 260px; pointer-events: auto !important;">
+                <div class="hud-label">TAMAMLANMA SÜRESİ</div>
+                <div class="hud-value" style="color: #48bb78; font-size: 24px;" id="finalTime">00:00.0</div>
+            </div>
+            <button class="btn-pro btn-start" id="victoryRestartBtn">BAŞTAN OYNA</button>
+            <a href="gamemenu.html" class="btn-pro btn-dark">ANA MENÜ</a>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+
+        // UI Elements
+        const startMenu = document.getElementById('startMenu');
+        const speedValEl = document.getElementById('speedVal');
+        const timeValEl = document.getElementById('timeVal');
+        const progressFill = document.getElementById('progressFill');
+        const progressMarker = document.getElementById('progressMarker');
+        const progTrack = document.getElementById('progTrack');
+        
+        // --- TRAFİK VE HIZ AYARLARI ---
+        const SPAWN_INTERVAL = 1000; // 1 saniye - Yoğun trafik
+        const MAX_BOTS_ON_SCREEN = 7;
+        const DISTANCE_SPEED_MULTIPLIER = 25.0; // Arcade Hızlı İlerleme
+
+        // Game Configuration
+        const TOTAL_DISTANCE = 175000; // 175 km (Meters)
+        let distanceCovered = 0;
+        let isPaused = true;
+        let isGameOver = false;
+        let soundEnabled = true;
+        
+        // Timer Variables
+        let elapsedTime = 0; 
+        let savedCheckpointTime = 0;
+
+        // Checkpoint / Districts System
+        const CHECKPOINTS = [
+            { name: 'Çayırova', dist: 0 },
+            { name: 'Kartal', dist: 30000 },
+            { name: 'Kadıköy', dist: 55000 },
+            { name: 'Bakırköy', dist: 85000 },
+            { name: 'B.Düzü', dist: 115000 },
+            { name: 'Silivri', dist: 145000 },
+            { name: 'Tekirdağ', dist: 175000 }
+        ];
+        let currentCheckpointIndex = 0;
+
+        function initCheckpointsUI() {
+            for(let i = 1; i < CHECKPOINTS.length - 1; i++) {
+                let cp = CHECKPOINTS[i];
+                let percent = (cp.dist / TOTAL_DISTANCE) * 100;
+                
+                let sign = document.createElement('div');
+                sign.className = 'highway-sign';
+                sign.style.bottom = `${percent}%`;
+                sign.textContent = cp.name;
+                progTrack.appendChild(sign);
+            }
+        }
+        initCheckpointsUI();
+
+        // Audio
+        const AudioCtx = window.AudioContext || window.webkitAudioContext;
+        let audioCtx = null;
+
+        function initAudio() {
+            if (!audioCtx) audioCtx = new AudioCtx();
+        }
+
+        function playSound(type) {
+            if (!soundEnabled || !audioCtx) return;
+            try {
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+
+                if (type === 'crash') {
+                    osc.type = 'sawtooth';
+                    osc.frequency.setValueAtTime(100, audioCtx.currentTime);
+                    osc.frequency.exponentialRampToValueAtTime(20, audioCtx.currentTime + 0.5);
+                    gain.gain.setValueAtTime(0.5, audioCtx.currentTime);
+                    gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.5);
+                    osc.start();
+                    osc.stop(audioCtx.currentTime + 0.5);
+                } else if (type === 'pass') {
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(600, audioCtx.currentTime);
+                    osc.frequency.linearRampToValueAtTime(900, audioCtx.currentTime + 0.3);
+                    gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
+                    gain.gain.linearRampToValueAtTime(0.01, audioCtx.currentTime + 0.3);
+                    osc.start();
+                    osc.stop(audioCtx.currentTime + 0.3);
+                }
+            } catch (e) {}
+        }
+
+        function formatTime(seconds) {
+            let m = Math.floor(seconds / 60);
+            let s = Math.floor(seconds % 60);
+            let ms = Math.floor((seconds % 1) * 10);
+            return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}.${ms}`;
+        }
+
+        let width = 0, height = 0, roadLeft = 0, roadWidth = 0, laneWidth = 0;
+
+        function resize() {
+            const container = document.getElementById('gameContainer');
+            width = container.clientWidth;
+            height = container.clientHeight;
+            canvas.width = width;
+            canvas.height = height;
+
+            roadWidth = Math.min(width * 0.82, 360);
+            roadLeft = (width - roadWidth) / 2;
+            laneWidth = roadWidth / 3;
+
+            if (player) {
+                player.width = laneWidth * 0.55;
+                player.height = player.width * 1.95;
+                if (!player.x) player.x = roadLeft + laneWidth * 1.5;
+                player.y = height - player.height - 80;
+                player.targetX = player.x;
+            }
+        }
+
+        const player = {
+            x: 0, targetX: 0, y: 0,
+            width: 40, height: 78,
+            speed: 0, maxSpeed: 170,
+            acceleration: 1.5, deceleration: 2.0,
+            isAccelerating: false
+        };
+
+        let roadOffsetY = 0;
+
+        const BOT_TYPES = [
+            { name: 'Egea', color: '#c0c0c0', widthMult: 0.55, heightMult: 1.9, topSpeed: 100 },
+            { name: 'Clio', color: '#e53e3e', widthMult: 0.52, heightMult: 1.7, topSpeed: 95 },
+            { name: 'Megane', color: '#2b6cb0', widthMult: 0.56, heightMult: 1.95, topSpeed: 110 },
+            { name: 'Civic', color: '#edf2f7', widthMult: 0.57, heightMult: 1.98, topSpeed: 115 },
+            { name: 'Polo', color: '#d69e2e', widthMult: 0.50, heightMult: 1.65, topSpeed: 90 }
+        ];
+
+        let bots = [];
+        let particles = [];
+        let lastSpawnTime = 0;
+        let tempMessage = "";
+        let tempMessageTimer = 0;
+
+        function showMessage(msg) {
+            tempMessage = msg;
+            tempMessageTimer = 2.0; 
+        }
+
+        function getLaneCenter(laneIndex) {
+            return roadLeft + (laneIndex + 0.5) * laneWidth;
+        }
+
+        function spawnBot() {
+            if (bots.length >= MAX_BOTS_ON_SCREEN) return;
+
+            const laneIndex = Math.floor(Math.random() * 3);
+            const type = BOT_TYPES[Math.floor(Math.random() * BOT_TYPES.length)];
+            
+            const safeDist = 180;
+            const isOccupied = bots.some(b => b.laneIndex === laneIndex && b.y < safeDist);
+            if (isOccupied) return;
+
+            let baseSpeed = 80;
+            if (laneIndex === 0) baseSpeed = 100 + Math.random() * 20;
+            else if (laneIndex === 1) baseSpeed = 85 + Math.random() * 15;
+            else baseSpeed = 70 + Math.random() * 15;
+
+            const bWidth = laneWidth * type.widthMult;
+            const bHeight = bWidth * type.heightMult;
+
+            bots.push({
+                x: getLaneCenter(laneIndex),
+                y: -bHeight - 50,
+                width: bWidth, height: bHeight,
+                speed: Math.min(baseSpeed, type.topSpeed),
+                color: type.color,
+                laneIndex: laneIndex
+            });
+        }
+
+        // Input Setup
+        let isTouching = false;
+        let touchStartX = 0;
+
+        function setupInput() {
+            const container = document.getElementById('gameContainer');
+            
+            const startAccelerate = (e, x) => {
+                // Eğer buton, link veya modallara tıklanıyorsa gaza basmayı iptal et
+                if (e.target.closest('button') || e.target.closest('a') || e.target.closest('.modal') || e.target.closest('.pro-menu')) return;
+                
+                if (isPaused || isGameOver) return;
+                initAudio();
+                isTouching = true;
+                player.isAccelerating = true;
+                touchStartX = x;
+            };
+
+            const moveSteering = (x) => {
+                if (!isTouching) return;
+                const deltaX = x - touchStartX;
+                touchStartX = x;
+                player.targetX += deltaX * 0.5;
+            };
+
+            const stopAccelerate = () => {
+                isTouching = false;
+                player.isAccelerating = false;
+            };
+
+            container.addEventListener('touchstart', (e) => startAccelerate(e, e.touches[0].clientX), { passive: false });
+            container.addEventListener('touchmove', (e) => moveSteering(e.touches[0].clientX), { passive: false });
+            container.addEventListener('touchend', stopAccelerate);
+
+            container.addEventListener('mousedown', (e) => startAccelerate(e, e.clientX));
+            window.addEventListener('mousemove', (e) => moveSteering(e.clientX));
+            window.addEventListener('mouseup', stopAccelerate);
+        }
+
+        function addParticles(x, y, color, count = 10) {
+            for (let i = 0; i < count; i++) {
+                particles.push({
+                    x: x, y: y,
+                    vx: (Math.random() - 0.5) * 4,
+                    vy: (Math.random() - 0.5) * 4,
+                    radius: Math.random() * 3 + 1,
+                    alpha: 1,
+                    color: color
+                });
+            }
+        }
+
+        function update(dt) {
+            if (isPaused || isGameOver) return;
+
+            elapsedTime += dt;
+            if (tempMessageTimer > 0) tempMessageTimer -= dt;
+
+            if (player.isAccelerating) {
+                player.speed += player.acceleration;
+                if (player.speed > player.maxSpeed) player.speed = player.maxSpeed;
+            } else {
+                player.speed -= player.deceleration;
+                if (player.speed < 0) player.speed = 0;
+            }
+
+            const minX = roadLeft + player.width / 2 + 5;
+            const maxX = roadLeft + roadWidth - player.width / 2 - 5;
+            player.targetX = Math.max(minX, Math.min(maxX, player.targetX));
+            player.x += (player.targetX - player.x) * 0.1;
+
+            const metersPerFrame = (player.speed * 1000 / 3600) * dt * DISTANCE_SPEED_MULTIPLIER; 
+            distanceCovered += metersPerFrame;
+
+            if (currentCheckpointIndex < CHECKPOINTS.length - 1) {
+                let nextCp = CHECKPOINTS[currentCheckpointIndex + 1];
+                if (distanceCovered >= nextCp.dist) {
+                    currentCheckpointIndex++;
+                    savedCheckpointTime = elapsedTime;
+                    showMessage(`📍 ${nextCp.name} Geçildi!`);
+                    playSound('pass');
+                }
+            }
+
+            if (distanceCovered >= TOTAL_DISTANCE) {
+                distanceCovered = TOTAL_DISTANCE;
+                triggerVictory();
+            }
+
+            speedValEl.textContent = Math.round(player.speed);
+            timeValEl.textContent = formatTime(elapsedTime);
+
+            const progressPercent = Math.min(100, (distanceCovered / TOTAL_DISTANCE) * 100);
+            progressFill.style.height = `${progressPercent}%`;
+            progressMarker.style.bottom = `${progressPercent}%`;
+
+            roadOffsetY += player.speed * dt * 8;
+            if (roadOffsetY > 60) roadOffsetY %= 60;
+
+            const now = performance.now();
+            if (now - lastSpawnTime > SPAWN_INTERVAL) {
+                spawnBot();
+                lastSpawnTime = now;
+            }
+
+            for (let i = 0; i < bots.length; i++) {
+                let b1 = bots[i];
+                for (let j = 0; j < bots.length; j++) {
+                    if (i === j) continue;
+                    let b2 = bots[j];
+                    if (b1.laneIndex === b2.laneIndex && b1.y > b2.y && (b1.y - b2.y < b1.height + 70)) {
+                        b1.speed = Math.min(b1.speed, b2.speed);
+                    }
+                }
+                const relativeSpeed = (player.speed - b1.speed) * dt * 8;
+                b1.y += relativeSpeed;
+            }
+
+            bots = bots.filter(b => b.y < height + 150 && b.y > -350);
+
+            const pBox = { left: player.x - player.width*0.4, right: player.x + player.width*0.4, top: player.y - player.height*0.4, bottom: player.y + player.height*0.4 };
+            for (let b of bots) {
+                const bBox = { left: b.x - b.width*0.4, right: b.x + b.width*0.4, top: b.y - b.height*0.4, bottom: b.y + b.height*0.4 };
+                if (pBox.left < bBox.right && pBox.right > bBox.left && pBox.top < bBox.bottom && pBox.bottom > bBox.top) {
+                    triggerGameOver();
+                    break;
+                }
+            }
+
+            for (let i = particles.length - 1; i >= 0; i--) {
+                let p = particles[i];
+                p.x += p.vx; p.y += p.vy;
+                p.alpha -= dt * 2;
+                if (p.alpha <= 0) particles.splice(i, 1);
+            }
+        }
+
+        function draw() {
+            ctx.clearRect(0, 0, width, height);
+
+            ctx.fillStyle = '#0a1015';
+            ctx.fillRect(0, 0, width, height);
+
+            ctx.fillStyle = '#4a5568';
+            ctx.fillRect(roadLeft, 0, roadWidth, height);
+
+            ctx.strokeStyle = '#cbd5e0';
+            ctx.lineWidth = 4;
+            ctx.beginPath();
+            ctx.moveTo(roadLeft, 0); ctx.lineTo(roadLeft, height);
+            ctx.moveTo(roadLeft + roadWidth, 0); ctx.lineTo(roadLeft + roadWidth, height);
+            ctx.stroke();
+
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
+            ctx.lineWidth = 3;
+            ctx.setLineDash([30, 40]);
+            ctx.lineDashOffset = -roadOffsetY;
+            for (let i = 1; i < 3; i++) {
+                ctx.beginPath();
+                ctx.moveTo(roadLeft + i * laneWidth, 0);
+                ctx.lineTo(roadLeft + i * laneWidth, height);
+                ctx.stroke();
+            }
+            ctx.setLineDash([]);
+
+            bots.forEach(b => drawVehicle(b.x, b.y, b.width, b.height, b.color, false));
+            drawVehicle(player.x, player.y, player.width, player.height, '#050505', true); 
+
+            particles.forEach(p => {
+                ctx.globalAlpha = p.alpha;
+                ctx.fillStyle = p.color;
+                ctx.beginPath(); ctx.arc(p.x, p.y, p.radius, 0, Math.PI*2); ctx.fill();
+            });
+            ctx.globalAlpha = 1.0;
+
+            const grad = ctx.createRadialGradient(width/2, height/2, height*0.3, width/2, height/2, height*0.8);
+            grad.addColorStop(0, 'rgba(0,0,0,0)');
+            grad.addColorStop(1, 'rgba(0,0,0,0.7)');
+            ctx.fillStyle = grad;
+            ctx.fillRect(0, 0, width, height);
+
+            if (tempMessageTimer > 0) {
+                ctx.fillStyle = `rgba(72, 187, 120, ${Math.min(1, tempMessageTimer)})`;
+                ctx.font = 'bold 22px sans-serif';
+                ctx.textAlign = 'center';
+                ctx.fillText(tempMessage, width / 2, height * 0.3);
+            }
+        }
+
+        function drawVehicle(x, y, w, h, color, isPlayer) {
+            ctx.save();
+            ctx.translate(x, y);
+
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
+            ctx.beginPath(); ctx.roundRect(-w/2 + 4, -h/2 + 4, w, h, 6); ctx.fill();
+
+            const lGrad = ctx.createLinearGradient(0, -h/2, 0, -h/2 - (isPlayer ? 160 : 100));
+            lGrad.addColorStop(0, 'rgba(255, 255, 220, 0.4)');
+            lGrad.addColorStop(1, 'rgba(255, 255, 220, 0)');
+            ctx.fillStyle = lGrad;
+            ctx.beginPath();
+            ctx.moveTo(-w*0.35, -h/2); ctx.lineTo(-w*0.8, -h/2 - (isPlayer?160:100));
+            ctx.lineTo(w*0.8, -h/2 - (isPlayer?160:100)); ctx.lineTo(w*0.35, -h/2);
+            ctx.fill();
+
+            ctx.fillStyle = color;
+            ctx.beginPath(); ctx.roundRect(-w/2, -h/2, w, h, 6); ctx.fill();
+
+            ctx.strokeStyle = isPlayer ? '#333' : 'rgba(255,255,255,0.2)';
+            ctx.lineWidth = 1;
+            ctx.stroke();
+
+            ctx.fillStyle = '#0f172a';
+            ctx.beginPath(); ctx.roundRect(-w*0.4, -h*0.22, w*0.8, h*0.2, 2); ctx.fill();
+            ctx.beginPath(); ctx.roundRect(-w*0.35, h*0.25, w*0.7, h*0.12, 2); ctx.fill();
+
+            ctx.fillStyle = '#fef08a';
+            ctx.fillRect(-w/2 + 2, -h/2 - 1, 6, 4);
+            ctx.fillRect(w/2 - 8, -h/2 - 1, 6, 4);
+
+            ctx.fillStyle = (isPlayer && !player.isAccelerating) ? '#ff0000' : '#8b0000';
+            ctx.fillRect(-w/2 + 2, h/2 - 3, 8, 4);
+            ctx.fillRect(w/2 - 10, h/2 - 3, 8, 4);
+
+            ctx.restore();
+        }
+
+        let lastTime = performance.now();
+        function loop(now) {
+            const dt = (now - lastTime) / 1000;
+            lastTime = now;
+            update(dt);
+            draw();
+            requestAnimationFrame(loop);
+        }
+
+        function triggerGameOver() {
+            isGameOver = true;
+            playSound('crash');
+            addParticles(player.x, player.y, '#fc8181', 30);
+            document.getElementById('crashText').textContent = `Kaza yaptın. ${CHECKPOINTS[currentCheckpointIndex].name} gişelerinden tekrar yola çıkıyorsun.`;
+            document.getElementById('gameOverModal').classList.add('active');
+        }
+
+        function triggerVictory() {
+            isGameOver = true;
+            document.getElementById('finalTime').textContent = formatTime(elapsedTime);
+            document.getElementById('victoryModal').classList.add('active');
+        }
+
+        function resumeFromCheckpoint() {
+            distanceCovered = CHECKPOINTS[currentCheckpointIndex].dist;
+            elapsedTime = savedCheckpointTime;
+            
+            player.speed = 0;
+            player.x = roadLeft + laneWidth * 1.5;
+            player.targetX = player.x;
+            bots = [];
+            particles = [];
+            isPaused = false;
+            isGameOver = false;
+
+            document.getElementById('gameOverModal').classList.remove('active');
+        }
+        
+        function fullRestart() {
+            currentCheckpointIndex = 0;
+            savedCheckpointTime = 0;
+            elapsedTime = 0;
+            distanceCovered = 0;
+            resumeFromCheckpoint(); 
+        }
+
+        // Button Event Listeners
+        document.getElementById('startGameBtn').addEventListener('click', () => {
+            initAudio();
+            startMenu.classList.add('hidden');
+            isPaused = false;
+        });
+
+        document.getElementById('pauseBtn').addEventListener('click', () => {
+            if (isGameOver || startMenu.classList.contains('hidden') === false) return;
+            isPaused = !isPaused;
+            document.getElementById('pauseModal').classList.toggle('active', isPaused);
+        });
+
+        document.getElementById('resumeBtn').addEventListener('click', () => {
+            isPaused = false;
+            document.getElementById('pauseModal').classList.remove('active');
+        });
+
+        document.getElementById('restartBtn').addEventListener('click', resumeFromCheckpoint);
+        document.getElementById('fullRestartBtn').addEventListener('click', fullRestart);
+        
+        document.getElementById('victoryRestartBtn').addEventListener('click', () => {
+            fullRestart();
+            document.getElementById('victoryModal').classList.remove('active');
+        });
+
+        document.getElementById('soundBtn').addEventListener('click', () => {
+            soundEnabled = !soundEnabled;
+            document.getElementById('soundBtn').textContent = soundEnabled ? '🔊' : '🔇';
+        });
+
+        window.addEventListener('resize', resize);
+        window.addEventListener('load', () => {
+            resize();
+            setupInput();
+            requestAnimationFrame(loop);
+        });
+    </script>
+</body>
+</html>

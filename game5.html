@@ -1,0 +1,547 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Ceotherm 501 Dart Pro</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600;700&display=swap');
+
+        * { box-sizing: border-box; margin: 0; padding: 0; user-select: none; touch-action: none; }
+        body, html { width: 100%; height: 100dvh; overflow: hidden; font-family: 'Rajdhani', sans-serif; background-color: #050a12; color: #fff; }
+        
+        .game-container { 
+            position: relative; 
+            width: 100%; 
+            height: 100dvh; 
+            background-image: url('images/games/game5back.png');
+            background-size: 100% 100%;
+            background-position: center;
+            background-repeat: no-repeat;
+            display: flex; 
+            flex-direction: column; 
+            align-items: center; 
+        }
+
+        .bg-overlay {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(5, 10, 18, 0.45);
+            z-index: 1;
+            pointer-events: none;
+        }
+
+        #hud { position: relative; width: 96%; margin-top: 2%; display: flex; justify-content: space-between; align-items: flex-start; z-index: 10; }
+        .score-box { background: rgba(13, 47, 92, 0.7); backdrop-filter: blur(5px); border: 2px solid; padding: 10px; border-radius: 8px; width: 30%; text-align: center; box-shadow: 0 0 15px rgba(0,0,0,0.5); transition: all 0.3s; }
+        .score-box span { display: block; font-size: 0.75rem; color: #cbd5e1; }
+        .score-box h3 { font-size: 2rem; margin-top: 5px; }
+        .score-box .char-name { font-size: 0.8rem; color: #fff; margin-top: 5px; background: rgba(0,0,0,0.5); border-radius: 4px; padding: 2px; }
+        
+        #player-score-box { border-color: #00f3ff; }
+        #player-score-box h3 { color: #00f3ff; text-shadow: 0 0 10px #00f3ff; }
+        #bot-score-box { border-color: #FF8C32; }
+        #bot-score-box h3 { color: #FF8C32; text-shadow: 0 0 10px #FF8C32; }
+
+        .active-turn { transform: scale(1.1); box-shadow: 0 0 20px rgba(255,255,255,0.3); }
+
+        .center-hud { display: flex; flex-direction: column; align-items: center; gap: 5px; }
+        .dart-icons { display: flex; gap: 5px; }
+        .dart-icon { width: 15px; height: 15px; border-radius: 50%; border: 2px solid #fff; }
+        .dart-icon.used { background: #ff003c; border-color: #ff003c; }
+
+        /* Dart Tahtası Konumlandırması (Görsele göre top:12% kullanıldı, değiştirebilirsin) */
+        #dart-container { position: absolute; top: 12%; width: 100%; height: 55%; display: flex; justify-content: center; align-items: center; z-index: 5; }
+        canvas { box-shadow: 0 20px 40px rgba(0,0,0,0.9); border-radius: 50%; background-color: #111; }
+
+        #interaction-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 20; }
+        #crosshair { position: absolute; width: 40px; height: 40px; transform: translate(-50%, -50%); pointer-events: none; opacity: 0; z-index: 21; transition: left 0.1s linear, top 0.1s linear; }
+        .ch-line { position: absolute; background: #ff003c; box-shadow: 0 0 8px #ff003c; }
+        .ch-h { top: 19px; left: -10px; width: 60px; height: 2px; }
+        .ch-v { left: 19px; top: -10px; width: 2px; height: 60px; }
+        .crosshair-circle { position: absolute; top: 50%; left: 50%; width: 20px; height: 20px; transform: translate(-50%, -50%); border: 2px solid #00f3ff; border-radius: 50%; box-shadow: 0 0 10px #00f3ff; }
+
+        #flying-dart { position: absolute; width: 20px; height: 60px; background: linear-gradient(to bottom, #cbd5e1 0%, #0d2f5c 50%, #FF8C32 100%); clip-path: polygon(50% 0%, 100% 20%, 80% 100%, 50% 90%, 20% 100%, 0% 20%); transform: translate(-50%, -50%) scale(3); opacity: 0; pointer-events: none; z-index: 25; filter: drop-shadow(0 10px 10px rgba(0,0,0,0.5)); }
+
+        #info-text { position: absolute; bottom: 8%; left: 50%; transform: translateX(-50%); font-size: 1.1rem; font-weight: 600; color: #00f3ff; text-align: center; z-index: 10; text-shadow: 0 0 10px #000; width: 100%; pointer-events: none;}
+        #score-popup { position: absolute; top: 45%; left: 50%; transform: translate(-50%, -50%) scale(0.5); font-size: 2.5rem; font-weight: 700; color: #fff; text-shadow: 0 0 20px #000; opacity: 0; z-index: 30; pointer-events: none; transition: all 0.4s ease-out; text-align: center; }
+        #turn-popup { position: absolute; top: 40%; left: 50%; transform: translate(-50%, -50%) scale(0.1); font-size: 3rem; font-weight: 700; color: #facc15; text-shadow: 0 0 20px #000, 0 0 10px #facc15; opacity: 0; z-index: 35; pointer-events: none; transition: all 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275); text-align: center; width:100%;}
+
+        .btn { background: linear-gradient(135deg, rgba(255, 140, 50, 0.9), rgba(212, 101, 11, 0.9)); border: 1px solid #FF8C32; color: #fff; padding: 10px 20px; border-radius: 4px; font-family: 'Rajdhani', sans-serif; font-weight: 700; font-size: 1.1rem; cursor: pointer; text-transform: uppercase; margin-top: 10px; width: 100%; box-shadow: 0 0 15px rgba(255,140,50,0.4); }
+        .btn-alt { background: rgba(13, 47, 92, 0.8); border-color: #00f3ff; color: #00f3ff; box-shadow: 0 0 10px rgba(0,243,255,0.2); }
+        
+        .modal-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(5, 10, 18, 0.95); backdrop-filter: blur(5px); display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 100; overflow-y: auto; padding: 20px 0;}
+        .hidden { display: none !important; }
+
+        .modal-card { background: linear-gradient(145deg, #0d2f5c, #050a12); border: 2px solid #FF8C32; padding: 20px; border-radius: 12px; text-align: center; width: 90%; max-width: 400px; box-shadow: 0 0 30px rgba(255, 140, 50, 0.3); margin: auto;}
+        .modal-card h2 { color: #FF8C32; margin-bottom: 10px; font-size: 1.8rem; }
+        
+        .char-grid { display: flex; flex-direction: column; gap: 8px; margin-bottom: 15px; max-height: 50vh; overflow-y: auto; padding-right: 5px;}
+        .char-card { background: rgba(0,0,0,0.4); border: 1px solid rgba(0,243,255,0.3); padding: 10px; border-radius: 6px; text-align: left; cursor: pointer; transition: all 0.2s;}
+        .char-card.selected { border-color: #facc15; background: rgba(250, 204, 21, 0.2); box-shadow: 0 0 15px rgba(250,204,21,0.4); }
+        .char-title { color: #00f3ff; font-weight: 700; font-size: 1.1rem; }
+        .char-desc { font-size: 0.8rem; color: #94a3b8; margin-bottom: 4px;}
+        .char-stats { font-size: 0.85rem; color: #fff; display: flex; justify-content: space-between;}
+        .stat-star { color: #facc15; }
+
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-thumb { background: #FF8C32; border-radius: 3px; }
+    </style>
+</head>
+<body>
+
+    <div class="game-container">
+        <div class="bg-overlay"></div>
+
+        <!-- HUD -->
+        <div id="hud">
+            <div class="score-box" id="player-score-box">
+                <span>SEN</span>
+                <h3 id="player-score">501</h3>
+                <div class="char-name" id="hud-player-char">-</div>
+            </div>
+            
+            <div class="center-hud">
+                <button class="btn btn-alt" style="margin:0; font-size:0.8rem; padding:4px 8px; width:auto;" onclick="togglePause()">DURDUR</button>
+                <span style="font-size:0.8rem; margin-top:5px; position:relative; z-index:10;">DARTLAR</span>
+                <div class="dart-icons" id="dart-icons" style="position:relative; z-index:10;">
+                    <div class="dart-icon" id="d1"></div>
+                    <div class="dart-icon" id="d2"></div>
+                    <div class="dart-icon" id="d3"></div>
+                </div>
+            </div>
+
+            <div class="score-box" id="bot-score-box">
+                <span>RAKİP</span>
+                <h3 id="bot-score">501</h3>
+                <div class="char-name" id="hud-bot-char">-</div>
+            </div>
+        </div>
+
+        <!-- Dart Tahtası -->
+        <div id="dart-container">
+            <canvas id="boardCanvas"></canvas>
+        </div>
+
+        <div id="info-text">Bekleniyor...</div>
+        
+        <!-- Animasyonlar -->
+        <div id="crosshair">
+            <div class="ch-line ch-h"></div>
+            <div class="ch-line ch-v"></div>
+            <div class="crosshair-circle"></div>
+        </div>
+        <div id="flying-dart"></div>
+        <div id="score-popup">PUAN</div>
+        <div id="turn-popup">SENİN SIRAN</div>
+
+        <div id="interaction-layer"></div>
+
+        <!-- Modallar -->
+        <div id="charModal" class="modal-overlay">
+            <div class="modal-card">
+                <h2>KARAKTERİNİ SEÇ</h2>
+                <p style="font-size:0.85rem; color:#cbd5e1; margin-bottom:10px;">Nişan yıldızı yüksek olanın eli az titrer. Hız yıldızı yüksek olan hızlı atar.</p>
+                <div class="char-grid" id="char-grid"></div>
+                <button class="btn" id="start-btn" onclick="startGame()">RAKİP BUL & BAŞLA</button>
+                <button class="btn btn-alt" onclick="window.location.href='gamemenu.html'">MENÜYE DÖN</button>
+            </div>
+        </div>
+
+        <div id="pauseModal" class="modal-overlay hidden">
+            <div class="modal-card">
+                <h2>MOLA</h2>
+                <p>Kurallar: 501 puandan düşülür. Oyunu bitirmek için tam "0" yapılmalı ve son atış DOUBLE (Çift) veya Bullseye olmalıdır!</p>
+                <button class="btn" onclick="togglePause()">DEVAM ET</button>
+                <button class="btn btn-alt" style="border-color:#ff003c; color:#ff003c;" onclick="location.reload()">YENİ OYUN</button>
+                <button class="btn btn-alt" onclick="window.location.href='gamemenu.html'">MENÜYE DÖN</button>
+            </div>
+        </div>
+
+        <div id="endModal" class="modal-overlay hidden">
+            <div class="modal-card">
+                <h2 id="end-title" style="font-size:2.5rem;">KAZANDIN!</h2>
+                <p id="end-desc" style="font-size:1.2rem; color:#fff;">Tebrikler.</p>
+                <button class="btn" onclick="location.reload()">YENİDEN OYNA</button>
+                <button class="btn btn-alt" onclick="window.location.href='gamemenu.html'">MENÜYE DÖN</button>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        // --- KARAKTER VERİTABANI ---
+        const CHARACTERS = [
+            { id: 1, name: "TURAN BABA", desc: "Dengeli veteran.", aim: 4, speed: 3, wobble: 6, throwMs: 350, botErr: 12 },
+            { id: 2, name: "VOLKAN BEY", desc: "Hızlı ama aceleci.", aim: 2, speed: 5, wobble: 15, throwMs: 200, botErr: 25 },
+            { id: 3, name: "ZIPKIN BATU", desc: "Sert ve atik.", aim: 3, speed: 5, wobble: 10, throwMs: 200, botErr: 18 },
+            { id: 4, name: "KARAVANA GÖKHAN", desc: "Atana kadar canı çıkar.", aim: 1, speed: 2, wobble: 25, throwMs: 500, botErr: 40 },
+            { id: 5, name: "ÖRDEK HASAN", desc: "Yavaş ama isabetli.", aim: 5, speed: 1, wobble: 3, throwMs: 600, botErr: 8 },
+            { id: 6, name: "DELGEÇ ORHAN", desc: "Tahtayı delen güç.", aim: 2, speed: 4, wobble: 18, throwMs: 250, botErr: 22 },
+            { id: 7, name: "MAHMUT HOCA", desc: "Dartın piri.", aim: 5, speed: 4, wobble: 2, throwMs: 280, botErr: 4 }
+        ];
+
+        let playerChar = null; let botChar = null;
+
+        const START_SCORE = 501;
+        let pScore = START_SCORE, bScore = START_SCORE;
+        let pTurnStartScore = START_SCORE, bTurnStartScore = START_SCORE;
+        let dartsThrown = 0, turn = 'player', state = 'idle', stuckDarts = [], isPaused = false;
+
+        const canvas = document.getElementById('boardCanvas');
+        const ctx = canvas.getContext('2d');
+        const interactLayer = document.getElementById('interaction-layer');
+        const crosshair = document.getElementById('crosshair');
+        const flyingDart = document.getElementById('flying-dart');
+        
+        let CX, CY, R;
+        const SECTORS = [20, 1, 18, 4, 13, 6, 10, 15, 2, 17, 3, 19, 7, 16, 8, 11, 14, 9, 12, 5];
+
+        function initCharSelect() {
+            const grid = document.getElementById('char-grid');
+            CHARACTERS.forEach(c => {
+                const card = document.createElement('div'); card.className = 'char-card';
+                card.innerHTML = `<div class="char-title">${c.name}</div><div class="char-desc">${c.desc}</div><div class="char-stats"><span>NİŞAN: <span class="stat-star">${'★'.repeat(c.aim)}${'☆'.repeat(5-c.aim)}</span></span><span>HIZ: <span class="stat-star">${'★'.repeat(c.speed)}${'☆'.repeat(5-c.speed)}</span></span></div>`;
+                card.onclick = () => { document.querySelectorAll('.char-card').forEach(el => el.classList.remove('selected')); card.classList.add('selected'); playerChar = c; };
+                grid.appendChild(card);
+            });
+        }
+        initCharSelect();
+
+        // --- PROFESYONEL ÖLÇÜLER İLE ÇİZİM MOTORU ---
+        function resizeAndDraw() {
+            let container = document.getElementById('dart-container');
+            // Hata korumalı genişlik hesabı
+            let w = (container && container.clientWidth > 0) ? container.clientWidth : window.innerWidth;
+            let h = (container && container.clientHeight > 0) ? container.clientHeight : (window.innerHeight * 0.55);
+            
+            // Tahtayı 280px sınırında tutarak uzağa alınmış hissi ver (Büyütmek istersen 280'i artır)
+            let size = Math.min(w * 0.9, h * 0.9, 220); 
+            if (size <= 0) size = 220;
+
+            canvas.width = size; canvas.height = size;
+            CX = size / 2; CY = size / 2; 
+            R = size / 2 * 0.82; // R = Double dış sınırı, geri kalanı dış çerçeve
+            
+            drawBoard(); drawStuckDarts();
+        }
+
+        function drawBoard() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            // Dış Mat Siyah Çerçeve
+            ctx.beginPath(); ctx.arc(CX, CY, canvas.width/2, 0, Math.PI*2); ctx.fillStyle = "#111"; ctx.fill();
+
+            const angleStep = (Math.PI * 2) / 20;
+            const startOffset = Math.PI * 1.5 - (angleStep / 2); 
+
+            // Paslanmaz Blade Telleri (Spider System)
+            ctx.lineWidth = 1.2;
+            ctx.strokeStyle = "rgba(210, 210, 210, 0.7)"; 
+
+            for (let i = 0; i < 20; i++) {
+                let startA = startOffset + i * angleStep, endA = startA + angleStep;
+                
+                // Profesyonel Renkler
+                let isEven = i % 2 === 0;
+                let cSingle = isEven ? "#181818" : "#f5e6c4"; // Siyah ve Sisal Kremi
+                let cRing = isEven ? "#e3292e" : "#309f6a"; // Kırmızı ve Yeşil
+
+                // 1. Double Çemberi (Ölçü: 162mm - 170mm -> %95.3 - %100)
+                ctx.beginPath(); ctx.moveTo(CX, CY); ctx.arc(CX, CY, R, startA, endA); 
+                ctx.fillStyle = cRing; ctx.fill(); ctx.stroke();
+                
+                // 2. Dış Single (Ölçü: 107mm - 162mm -> %62.9 - %95.3)
+                ctx.beginPath(); ctx.moveTo(CX, CY); ctx.arc(CX, CY, R * 0.953, startA, endA); 
+                ctx.fillStyle = cSingle; ctx.fill(); ctx.stroke();
+                
+                // 3. Triple Çemberi (Ölçü: 99mm - 107mm -> %58.2 - %62.9)
+                ctx.beginPath(); ctx.moveTo(CX, CY); ctx.arc(CX, CY, R * 0.629, startA, endA); 
+                ctx.fillStyle = cRing; ctx.fill(); ctx.stroke();
+                
+                // 4. İç Single (Ölçü: 15.9mm - 99mm -> %9.35 - %58.2)
+                ctx.beginPath(); ctx.moveTo(CX, CY); ctx.arc(CX, CY, R * 0.582, startA, endA); 
+                ctx.fillStyle = cSingle; ctx.fill(); ctx.stroke();
+
+                // Numaralar
+                let midA = startA + angleStep / 2;
+                let numX = CX + Math.cos(midA) * (R * 1.12);
+                let numY = CY + Math.sin(midA) * (R * 1.12);
+                ctx.save(); ctx.translate(numX, numY); ctx.rotate(midA + Math.PI / 2);
+                ctx.fillStyle = "#fff"; ctx.font = `bold ${R * 0.12}px sans-serif`; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+                ctx.fillText(SECTORS[i], 0, 0); ctx.restore();
+            }
+
+            // Outer Bull (Yeşil - Ölçü: 15.9mm -> %9.35)
+            ctx.beginPath(); ctx.arc(CX, CY, R * 0.0935, 0, Math.PI*2); ctx.fillStyle = "#309f6a"; ctx.fill(); ctx.stroke();
+            
+            // Inner Bull (Kırmızı - Ölçü: 6.35mm -> %3.7)
+            ctx.beginPath(); ctx.arc(CX, CY, R * 0.037, 0, Math.PI*2); ctx.fillStyle = "#e3292e"; ctx.fill(); ctx.stroke();
+            
+            // Gerçekçi Işık ve Gölge (Sisal dokusu)
+            let grad = ctx.createRadialGradient(CX, CY, 0, CX, CY, canvas.width/2);
+            grad.addColorStop(0, "rgba(0,0,0,0)"); 
+            grad.addColorStop(0.7, "rgba(0,0,0,0.1)"); 
+            grad.addColorStop(1, "rgba(0,0,0,0.7)");
+            ctx.beginPath(); ctx.arc(CX, CY, canvas.width/2, 0, Math.PI*2); ctx.fillStyle = grad; ctx.fill();
+        }
+
+        function drawStuckDarts() {
+            stuckDarts.forEach(d => {
+                let cX = d.x, cY = d.y;
+                ctx.beginPath(); ctx.arc(cX, cY, 3, 0, Math.PI*2); ctx.fillStyle = "#fff"; ctx.shadowColor = "#000"; ctx.shadowBlur = 5; ctx.fill();
+                ctx.shadowBlur = 0; ctx.lineWidth = 1.5; ctx.strokeStyle = d.color || "#00f3ff";
+                ctx.beginPath(); ctx.moveTo(cX-4, cY-4); ctx.lineTo(cX+4, cY+4); ctx.stroke();
+                ctx.beginPath(); ctx.moveTo(cX+4, cY-4); ctx.lineTo(cX-4, cY+4); ctx.stroke();
+            });
+        }
+
+        // --- PROFESYONEL ÖLÇÜLERE GÖRE PUANLAMA MANTIĞI ---
+        function getScoreObj(x, y) {
+            let dx = x - CX, dy = y - CY;
+            let dist = Math.sqrt(dx*dx + dy*dy);
+            let norm = dist / R; 
+
+            if (norm > 1.0) return { pts: 0, mult: 1, text: "KARAVANA!", color: "#94a3b8" };
+            if (norm <= 0.037) return { pts: 50, mult: 2, text: "BULLSEYE!", color: "#ff003c" };
+            if (norm <= 0.0935) return { pts: 25, mult: 1, text: "OUTER BULL", color: "#309f6a" };
+
+            let angle = Math.atan2(dy, dx) * (180 / Math.PI);
+            let adjAngle = (angle + 90 + 360 + 9) % 360; 
+            let sector = SECTORS[Math.floor(adjAngle / 18)];
+
+            if (norm >= 0.582 && norm <= 0.629) return { pts: sector * 3, mult: 3, text: `TRIPLE ${sector}`, color: "#facc15" };
+            if (norm >= 0.953 && norm <= 1.00) return { pts: sector * 2, mult: 2, text: `DOUBLE ${sector}`, color: "#00f3ff" };
+            return { pts: sector, mult: 1, text: `${sector} PUAN`, color: "#fff" };
+        }
+
+        function getCoordsForTarget(targetSector, targetMult) {
+            if(targetSector === 25 && targetMult === 2) return {x: CX, y: CY};
+            if(targetSector === 25 && targetMult === 1) return {x: CX + (R*0.06), y: CY};
+            
+            let index = SECTORS.indexOf(targetSector);
+            let angleRad = (-90 + (index * 18)) * Math.PI / 180;
+            
+            // Hedefleme oranları (Single hedeflerken dışarıdaki geniş alana nişan alır)
+            let distTarget = R * 0.76; 
+            if(targetMult === 3) distTarget = R * 0.605;
+            if(targetMult === 2) distTarget = R * 0.976;
+
+            return {
+                x: CX + Math.cos(angleRad) * distTarget,
+                y: CY + Math.sin(angleRad) * distTarget
+            };
+        }
+
+        function getBotLogicTarget(currentScore) {
+            if(currentScore > 40) return getCoordsForTarget(20, 3);
+            if(currentScore <= 40 && currentScore % 2 === 0) return getCoordsForTarget(currentScore/2, 2);
+            if(currentScore % 2 !== 0) return getCoordsForTarget(1, 1);
+            return getCoordsForTarget(20, 1);
+        }
+
+        function startGame() {
+            if(!playerChar) { alert("Lütfen bir karakter seç!"); return; }
+            
+            let opponents = CHARACTERS.filter(c => c.id !== playerChar.id);
+            botChar = opponents[Math.floor(Math.random() * opponents.length)];
+
+            document.getElementById('hud-player-char').innerText = playerChar.name;
+            document.getElementById('hud-bot-char').innerText = botChar.name;
+
+            document.getElementById('charModal').classList.add('hidden');
+            document.getElementById('pauseModal').classList.add('hidden');
+            document.getElementById('endModal').classList.add('hidden');
+            
+            pScore = START_SCORE; bScore = START_SCORE;
+
+            // Ekran problemini çözen 50ms gecikmeli tetikleyici
+            setTimeout(() => {
+                resizeAndDraw();
+                updateScores();
+                switchTurn('player');
+            }, 50);
+        }
+
+        function updateScores() {
+            document.getElementById('player-score').innerText = pScore;
+            document.getElementById('bot-score').innerText = bScore;
+        }
+
+        function switchTurn(newTurn) {
+            turn = newTurn; dartsThrown = 0; stuckDarts = []; 
+            drawBoard();
+            
+            document.getElementById('d1').classList.remove('used');
+            document.getElementById('d2').classList.remove('used');
+            document.getElementById('d3').classList.remove('used');
+
+            document.getElementById('player-score-box').classList.toggle('active-turn', turn === 'player');
+            document.getElementById('bot-score-box').classList.toggle('active-turn', turn === 'bot');
+
+            if(turn === 'player') {
+                pTurnStartScore = pScore; state = 'idle';
+                showTurnBanner("SENİN SIRAN!", "#00f3ff");
+                document.getElementById('info-text').innerText = "Nişan almak için basılı tut.";
+            } else {
+                bTurnStartScore = bScore; state = 'bot_playing';
+                showTurnBanner(`${botChar.name} ATIYOR`, "#FF8C32");
+                document.getElementById('info-text').innerText = "Rakip atış yapıyor...";
+                setTimeout(botPlayDart, 2000);
+            }
+        }
+
+        function showTurnBanner(text, color) {
+            const tp = document.getElementById('turn-popup');
+            tp.innerText = text; tp.style.color = color; tp.style.textShadow = `0 0 20px #000, 0 0 10px ${color}`;
+            tp.style.opacity = '1'; tp.style.transform = 'translate(-50%, -50%) scale(1)';
+            setTimeout(() => { tp.style.opacity = '0'; tp.style.transform = 'translate(-50%, -50%) scale(0.1)'; }, 1500);
+        }
+
+        function showDartPopup(text, pts, color="#facc15") {
+            const sp = document.getElementById('score-popup');
+            sp.innerHTML = `${text}<br><span style="color:${color}; font-size:1.8rem; text-shadow:0 0 10px ${color}">${pts} Puan</span>`;
+            sp.style.opacity = '1'; sp.style.transform = 'translate(-50%, -50%) scale(1)';
+            setTimeout(() => { sp.style.opacity = '0'; sp.style.transform = 'translate(-50%, -50%) scale(0.5)'; }, 1000);
+        }
+
+        function showBustPopup() {
+            const sp = document.getElementById('score-popup');
+            sp.innerHTML = `BUST! (YANDIN)<br><span style="color:#ff003c; font-size:1.2rem;">Puan sıfırlandı</span>`;
+            sp.style.opacity = '1'; sp.style.transform = 'translate(-50%, -50%) scale(1.2)';
+            setTimeout(() => { sp.style.opacity = '0'; sp.style.transform = 'translate(-50%, -50%) scale(0.5)'; }, 1500);
+        }
+
+        let aimX = 0, aimY = 0, currentX = 0, currentY = 0, startTX = 0, startTY = 0, bAimX = 0, bAimY = 0, aimFrame;
+        
+        function updateAim() {
+            if (state !== 'aiming') return;
+            let time = Date.now() / 150;
+            let w = playerChar.wobble;
+            currentX = aimX + (Math.sin(time) * w);
+            currentY = aimY + (Math.cos(time * 1.3) * w);
+            crosshair.style.left = currentX + 'px'; crosshair.style.top = currentY + 'px';
+            aimFrame = requestAnimationFrame(updateAim);
+        }
+
+        interactLayer.addEventListener('touchstart', (e) => {
+            if (state !== 'idle' || turn !== 'player') return; state = 'aiming';
+            const rect = canvas.getBoundingClientRect();
+            bAimX = rect.left + CX; bAimY = rect.top + CY; aimX = bAimX; aimY = bAimY;
+            startTX = e.touches[0].clientX; startTY = e.touches[0].clientY;
+            crosshair.style.transition = 'none'; crosshair.style.opacity = '1'; updateAim();
+        }, {passive: false});
+
+        interactLayer.addEventListener('touchmove', (e) => {
+            if (state !== 'aiming') return; e.preventDefault();
+            aimX = bAimX + (e.touches[0].clientX - startTX) * 1.5;
+            aimY = bAimY + (e.touches[0].clientY - startTY) * 1.5;
+        }, {passive: false});
+
+        interactLayer.addEventListener('touchend', (e) => {
+            if (state !== 'aiming') return; cancelAnimationFrame(aimFrame); state = 'throwing'; crosshair.style.opacity = '0';
+            throwDart(currentX, currentY, playerChar);
+        });
+
+        function botPlayDart() {
+            if(state !== 'bot_playing' || turn !== 'bot') return;
+            let targetCoords = getBotLogicTarget(bScore);
+            let err = botChar.botErr;
+            let finalX = targetCoords.x + (Math.random() * err * 2 - err);
+            let finalY = targetCoords.y + (Math.random() * err * 2 - err);
+            
+            const rect = canvas.getBoundingClientRect();
+            let screenX = rect.left + finalX; let screenY = rect.top + finalY;
+
+            crosshair.style.transition = 'left 0.8s ease-out, top 0.8s ease-out'; crosshair.style.opacity = '1';
+            crosshair.style.left = (rect.left + CX) + 'px'; crosshair.style.top = (rect.top + CY) + 'px';
+            
+            setTimeout(() => {
+                crosshair.style.left = screenX + 'px'; crosshair.style.top = screenY + 'px';
+                setTimeout(() => { crosshair.style.opacity = '0'; throwDart(screenX, screenY, botChar); }, 1000);
+            }, 100);
+        }
+
+        function throwDart(screenX, screenY, charObj) {
+            flyingDart.style.transition = 'none'; flyingDart.style.opacity = '1'; flyingDart.style.left = '50%'; flyingDart.style.top = '100%'; flyingDart.style.transform = 'translate(-50%, -50%) scale(3)';
+            void flyingDart.offsetWidth;
+            flyingDart.style.transition = `all ${charObj.throwMs}ms cubic-bezier(0.25, 1, 0.5, 1)`;
+            flyingDart.style.left = screenX + 'px'; flyingDart.style.top = screenY + 'px'; flyingDart.style.transform = 'translate(-50%, -50%) scale(0.1)';
+
+            setTimeout(() => {
+                flyingDart.style.opacity = '0';
+                const rect = canvas.getBoundingClientRect(); let cX = screenX - rect.left; let cY = screenY - rect.top;
+                stuckDarts.push({x: cX, y: cY, color: turn === 'player' ? '#00f3ff' : '#FF8C32'});
+                drawStuckDarts();
+                
+                let sObj = getScoreObj(cX, cY);
+                processScore(sObj);
+            }, charObj.throwMs);
+        }
+
+        function processScore(sObj) {
+            dartsThrown++; document.getElementById('d'+dartsThrown).classList.add('used');
+            let isPlayer = (turn === 'player');
+            let currentScore = isPlayer ? pScore : bScore;
+            let tempScore = currentScore - sObj.pts;
+
+            showDartPopup(sObj.text, sObj.pts, sObj.color);
+
+            let isBust = false, isWin = false;
+            if (tempScore === 0) { if (sObj.mult === 2) isWin = true; else isBust = true; }
+            else if (tempScore < 0 || tempScore === 1) { isBust = true; }
+
+            if (isWin) {
+                if(isPlayer) pScore = 0; else bScore = 0;
+                updateScores(); endGame(isPlayer); return;
+            }
+
+            if (isBust) {
+                setTimeout(showBustPopup, 800);
+                if(isPlayer) pScore = pTurnStartScore; else bScore = bTurnStartScore;
+                updateScores();
+                setTimeout(() => switchTurn(isPlayer ? 'bot' : 'player'), 2500);
+                return;
+            }
+
+            if(isPlayer) pScore = tempScore; else bScore = tempScore;
+            updateScores();
+
+            if(dartsThrown < 3) {
+                if(turn === 'player') state = 'idle'; else setTimeout(botPlayDart, 1500);
+            } else {
+                setTimeout(() => switchTurn(isPlayer ? 'bot' : 'player'), 1500);
+            }
+        }
+
+        function endGame(playerWon) {
+            state = 'gameover';
+            const title = document.getElementById('end-title'); const desc = document.getElementById('end-desc');
+            if(playerWon) { title.innerText = "KAZANDIN!"; title.style.color = "#00f3ff"; desc.innerText = "Rakibini Double-Out yaparak ezdin geçtin!"; }
+            else { title.innerText = "KAYBETTİN!"; title.style.color = "#ff003c"; desc.innerText = `${botChar.name} oyunu bitirdi!`; }
+            setTimeout(() => { document.getElementById('endModal').classList.remove('hidden'); }, 1000);
+        }
+
+        function togglePause() {
+            if(state === 'gameover') return; isPaused = !isPaused;
+            document.getElementById('pauseModal').classList.toggle('hidden', !isPaused);
+        }
+
+        interactLayer.addEventListener('mousedown', (e) => {
+            if (state !== 'idle' || turn !== 'player') return; state = 'aiming';
+            const rect = canvas.getBoundingClientRect();
+            bAimX = rect.left + CX; bAimY = rect.top + CY; aimX = bAimX; aimY = bAimY;
+            startTX = e.clientX; startTY = e.clientY; crosshair.style.transition = 'none'; crosshair.style.opacity = '1'; updateAim();
+        });
+        interactLayer.addEventListener('mousemove', (e) => {
+            if (state !== 'aiming') return; aimX = bAimX + (e.clientX - startTX) * 1.5; aimY = bAimY + (e.clientY - startTY) * 1.5;
+        });
+        interactLayer.addEventListener('mouseup', (e) => {
+            if (state !== 'aiming') return; cancelAnimationFrame(aimFrame); state = 'throwing'; crosshair.style.opacity = '0'; throwDart(currentX, currentY, playerChar);
+        });
+
+        // Sayfa yüklendiğinde canvası hesapla (Güvenlik Önlemi)
+        window.addEventListener('load', resizeAndDraw);
+
+    </script>
+</body>
+</html>

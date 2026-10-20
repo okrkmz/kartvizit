@@ -1,0 +1,588 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Tır Yükleme Ustası - Ceotherm</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/matter-js/0.19.0/matter.min.js"></script>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            background-color: #000;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            touch-action: none;
+            user-select: none;
+        }
+
+        /* Tüm Ekran Arka Planı (game7back.png) */
+        #game-container {
+            position: relative;
+            width: 100%;
+            height: 100dvh;
+            background-image: url('images/games/game7back.png');
+            background-size: 100% 100%;
+            background-position: center;
+            background-repeat: no-repeat;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Fizik Alanı (Tır Kasasının Üstü) */
+        canvas {
+            display: block;
+            width: 100%;
+            height: 50dvh; /* Tır kasası hizası */
+            background: transparent;
+        }
+
+        /* -------------------------------------------------------------
+           ŞEFFAF KUMANDA BUTONLARI (KUMANDA GÖRSELİNİN ÜZERİNE OTURUR)
+           ------------------------------------------------------------- */
+        #ui-panel {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100dvh;
+            pointer-events: none; /* Arka plana tıklamayı engellemez */
+            z-index: 5;
+        }
+
+        .ctrl-btn {
+            position: absolute;
+            pointer-events: auto;
+            background: rgba(255, 255, 255, 0); /* TAMAMEN ŞEFFAF */
+            border-radius: 12px;
+            cursor: pointer;
+            touch-action: none;
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        /* Tuşa basıldığında hafif turuncu dokunma geri bildirimi */
+        .ctrl-btn:active {
+            background: rgba(255, 140, 50, 0.35);
+            box-shadow: 0 0 15px rgba(255, 140, 50, 0.6);
+        }
+
+        /* BUTON KONUMLARI (Görseldeki Kumandaya Göre Hizalanmıştır) */
+        
+        /* 1. Kırmızı Acil Durdurma Butonu */
+        #btn-stop {
+            top: 60%;
+            left: 28%;
+            width: 18%;
+            height: 13%;
+            border-radius: 50%; /* Yuvarlak buton */
+        }
+
+        /* 2. Yeşil Bırak (Drop) Butonu */
+        #btn-drop {
+            top: 60%;
+            left: 55%;
+            width: 18%;
+            height: 13%;
+            border-radius: 50%; /* Yuvarlak buton */
+        }
+
+        /* 3. YUKARI (▲) */
+        #btn-up {
+            top: 77.5%;
+            left: 32.5%;
+            width: 16.5%;
+            height: 8%;
+        }
+
+        /* 4. AŞAĞI (▼) */
+        #btn-down {
+            top: 77.5%;
+            left: 51%;
+            width: 16.5%;
+            height: 8%;
+        }
+
+        /* 5. SOL (◄) */
+        #btn-left {
+            top: 88%;
+            left: 32.5%;
+            width: 16.5%;
+            height: 8%;
+        }
+
+        /* 6. SAĞ (►) */
+        #btn-right {
+            top: 88%;
+            left: 51%;
+            width: 16.5%;
+            height: 8%;
+        }
+
+        /* HUD - Puan ve Sayaç */
+        #hud {
+            position: absolute;
+            top: 15px;
+            left: 15px;
+            right: 15px;
+            display: flex;
+            justify-content: space-between;
+            pointer-events: none;
+            z-index: 10;
+        }
+
+        .stat-box {
+            background: rgba(13, 47, 92, 0.85);
+            padding: 8px 15px;
+            border-radius: 8px;
+            border: 2px solid #FF8C32;
+            color: white;
+            font-weight: bold;
+            font-size: 1rem;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.5);
+        }
+
+        #warning-box {
+            position: absolute;
+            top: 75px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(255, 0, 0, 0.9);
+            color: white;
+            padding: 10px 25px;
+            border-radius: 8px;
+            font-weight: bold;
+            font-size: 1.2rem;
+            border: 2px solid white;
+            display: none;
+            z-index: 10;
+            box-shadow: 0 0 20px rgba(255,0,0,0.7);
+            text-align: center;
+        }
+
+        /* Modallar */
+        .modal {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(13, 47, 92, 0.95);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 100;
+            visibility: hidden;
+            color: white;
+            text-align: center;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+
+        .modal h1 { color: #FF8C32; font-size: 2.2rem; margin-bottom: 10px; }
+        .modal p { font-size: 1.1rem; line-height: 1.5; margin-bottom: 25px; }
+        .modal button {
+            padding: 15px 40px;
+            font-size: 1.2rem;
+            background: #FF8C32;
+            border: none;
+            color: #0d2f5c;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: bold;
+            margin: 8px;
+            width: 80%;
+            max-width: 280px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+        }
+    </style>
+</head>
+<body>
+
+<div id="game-container">
+    <div id="hud">
+        <div class="stat-box">HACİM: <span id="score-val">0</span> m³</div>
+        <div class="stat-box">YÜK: <span id="item-count">0</span></div>
+    </div>
+
+    <div id="warning-box">DİKKAT YÜK TAŞTI!<br><span id="warn-sec">3.0</span>s</div>
+
+    <canvas id="gameCanvas"></canvas>
+
+    <!-- Kumanda Üzerindeki Şeffaf Dokunma Alanları -->
+    <div id="ui-panel">
+        <div class="ctrl-btn" id="btn-stop"></div>
+        <div class="ctrl-btn" id="btn-drop"></div>
+        
+        <div class="ctrl-btn" id="btn-up"></div>
+        <div class="ctrl-btn" id="btn-down"></div>
+        <div class="ctrl-btn" id="btn-left"></div>
+        <div class="ctrl-btn" id="btn-right"></div>
+    </div>
+</div>
+
+<div id="start-modal" class="modal" style="visibility: visible;">
+    <h1>TIR YÜKLEME USTASI</h1>
+    <p>Sanayi parçalarını tır kasasına dengeli istifle.<br><b>Vinç kumandasını kullanarak yükleri yerleştir!</b><br>Sınırların dışına taşan yükü 3 saniyede düzeltmezsen kaybedersin!</p>
+    <button onclick="startGame()">OYUNA BAŞLA</button>
+</div>
+
+<div id="pause-modal" class="modal">
+    <h1>MOLA</h1>
+    <button onclick="resumeGame()">DEVAM ET</button>
+    <button onclick="location.href='gamemenu.html'" style="background:#555; color:white;">ANA MENÜ</button>
+</div>
+
+<div id="game-over-modal" class="modal">
+    <h1 style="color:#ff4444;">YÜK DEVRİLDİ!</h1>
+    <p>Toplam Yüklenen: <b style="color:#FF8C32; font-size:1.5rem;"><span id="final-score">0</span> m³</b></p>
+    <button onclick="location.reload()">TEKRAR DENE</button>
+    <button onclick="location.href='gamemenu.html'" style="background:#555; color:white;">ANA MENÜ</button>
+</div>
+
+<script>
+    const { Engine, Render, Runner, Bodies, Body, Composite, Events } = Matter;
+
+    let engine, render, runner;
+    
+    // Vinç ve Kanca Pozisyonu
+    let craneX = 0;
+    let hookY = 60;
+    const MIN_HOOK_Y = 50;
+    let MAX_HOOK_Y = 0;
+
+    let currentItem = null;
+    let items = [];
+    let score = 0;
+    let isGameOver = false;
+    let isPaused = false;
+    let isDropLocked = false;
+    let violationStartTime = null;
+
+    const SAFE_ZONE = { x: 0, y: 0, w: 0, h: 0 };
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+
+    // Endüstriyel Parça Türleri
+    const itemTypes = [
+        { name: 'Kasa', w: 55, h: 55, type: 'rect', vol: 2.5, draw: drawCrate },
+        { name: 'Boru', w: 110, h: 24, type: 'rect', vol: 1.8, draw: drawPipe },
+        { name: 'Bobin', r: 30, type: 'circle', vol: 4.2, draw: drawCoil },
+        { name: 'Tüp', w: 30, h: 75, type: 'rect', vol: 3.0, draw: drawCylinder },
+        { name: 'Palet', w: 90, h: 35, type: 'rect', vol: 3.8, draw: drawPallet }
+    ];
+
+    function initPhysics() {
+        engine = Engine.create({
+            positionIterations: 10,
+            velocityIterations: 10
+        });
+        
+        render = Render.create({
+            canvas: canvas,
+            engine: engine,
+            options: {
+                width: window.innerWidth,
+                height: window.innerHeight * 0.5, // Canvas tır kasasına hizalı
+                wireframes: false,
+                background: 'transparent'
+            }
+        });
+
+        const canvasHeight = render.options.height;
+        const groundY = canvasHeight - 15; // Tır kasasının tam üstü
+
+        // Zemin ve Kasalar
+        const ground = Bodies.rectangle(window.innerWidth/2, groundY, window.innerWidth, 30, { 
+            isStatic: true, 
+            friction: 0.9 
+        });
+        
+        SAFE_ZONE.w = window.innerWidth * 0.60; // Tır dorse genişliği
+        SAFE_ZONE.h = 90;
+        SAFE_ZONE.x = (window.innerWidth - SAFE_ZONE.w) / 2 + 30; // Kasayı tıra tam hizaladık
+        SAFE_ZONE.y = groundY - 15 - SAFE_ZONE.h;
+        MAX_HOOK_Y = SAFE_ZONE.y -50;
+
+        Composite.add(engine.world, [ground]);
+
+        craneX = window.innerWidth / 2;
+
+        Events.on(render, 'afterRender', customRender);
+        Events.on(engine, 'beforeUpdate', updateCraneAndCarriedItem);
+
+        runner = Runner.create();
+        Runner.run(runner, engine);
+        Render.run(render);
+    }
+
+    function spawnItem() {
+        if (isGameOver) return;
+        
+        const type = itemTypes[Math.floor(Math.random() * itemTypes.length)];
+        let body;
+
+        if (type.type === 'rect') {
+            body = Bodies.rectangle(craneX, hookY + (type.h/2) + 10, type.w, type.h, { 
+                isSensor: true,
+                friction: 0.9,
+                restitution: 0.05
+            });
+        } else {
+            body = Bodies.circle(craneX, hookY + type.r + 10, type.r, { 
+                isSensor: true,
+                friction: 0.9,
+                restitution: 0.05
+            });
+        }
+
+        body.meta = type;
+        body.isOut = false;
+
+        currentItem = body;
+        Composite.add(engine.world, currentItem);
+        isDropLocked = false;
+    }
+
+    function dropItem() {
+        if (!currentItem || isGameOver || isDropLocked) return;
+
+        isDropLocked = true;
+
+        Body.set(currentItem, { isSensor: false });
+        Body.setVelocity(currentItem, { x: 0, y: 2 });
+
+        items.push(currentItem);
+        
+        score += currentItem.meta.vol;
+        document.getElementById('score-val').innerText = score.toFixed(1);
+        document.getElementById('item-count').innerText = items.length;
+
+        currentItem = null;
+
+        craneX = window.innerWidth / 2;
+        hookY = MIN_HOOK_Y;
+
+        setTimeout(spawnItem, 150);
+    }
+
+    function updateCraneAndCarriedItem() {
+        if (isGameOver || isPaused) return;
+
+        const speed = 4;
+        if (keys['btn-left']) craneX = Math.max(30, craneX - speed);
+        if (keys['btn-right']) craneX = Math.min(canvas.width - 30, craneX + speed);
+        if (keys['btn-up']) hookY = Math.max(MIN_HOOK_Y, hookY - speed);
+        if (keys['btn-down']) hookY = Math.min(MAX_HOOK_Y, hookY + speed);
+
+        if (currentItem) {
+            const type = currentItem.meta;
+            const offsetY = type.h ? (type.h / 2 + 10) : (type.r + 10);
+            Body.setPosition(currentItem, { x: craneX, y: hookY + offsetY });
+            Body.setAngle(currentItem, 0);
+            Body.setVelocity(currentItem, { x: 0, y: 0 });
+        }
+    }
+
+    // --- RENDER (ÇİZİM) ---
+    function customRender() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        // 1. Güvenli Bölge (Yeşil Kesikli Çizgiler)
+        ctx.lineWidth = 3;
+        ctx.setLineDash([12, 8]);
+        ctx.strokeStyle = '#00FF00';
+        ctx.strokeRect(SAFE_ZONE.x, SAFE_ZONE.y, SAFE_ZONE.w, SAFE_ZONE.h + 15);
+        ctx.setLineDash([]);
+
+        // 2. Vinç Rayı, İp ve Kanca Çizimi
+        ctx.fillStyle = '#222';
+        ctx.fillRect(0, 5, canvas.width, 14);
+        ctx.fillStyle = '#FF8C32';
+        ctx.fillRect(craneX - 20, 5, 40, 14);
+
+        ctx.beginPath();
+        ctx.moveTo(craneX, 19);
+        ctx.lineTo(craneX, hookY);
+        ctx.strokeStyle = '#fff';
+        ctx.lineWidth = 2.5;
+        ctx.stroke();
+
+        ctx.fillStyle = '#fbc531';
+        ctx.beginPath();
+        ctx.arc(craneX, hookY, 6, 0, Math.PI * 2);
+        ctx.fill();
+
+        // 3. Yüklerin Çizimi
+        const allItems = currentItem ? [...items, currentItem] : items;
+        
+        allItems.forEach(item => {
+            ctx.save();
+            ctx.translate(item.position.x, item.position.y);
+            ctx.rotate(item.angle);
+
+            if (item.isOut) {
+                ctx.shadowColor = '#ff0000';
+                ctx.shadowBlur = 15;
+            }
+
+            item.meta.draw(ctx, item);
+            ctx.restore();
+        });
+
+        checkViolations();
+    }
+
+    // Şekil Çizimleri
+    function drawCrate(ctx, item) {
+        const w = item.meta.w, h = item.meta.h;
+        ctx.fillStyle = item.isOut ? '#e74c3c' : '#8B5A2B';
+        ctx.fillRect(-w/2, -h/2, w, h);
+        ctx.strokeStyle = '#4a2e11';
+        ctx.lineWidth = 3;
+        ctx.strokeRect(-w/2, -h/2, w, h);
+        ctx.beginPath();
+        ctx.moveTo(-w/2, -h/2); ctx.lineTo(w/2, h/2);
+        ctx.moveTo(w/2, -h/2); ctx.lineTo(-w/2, h/2);
+        ctx.stroke();
+    }
+
+    function drawPipe(ctx, item) {
+        const w = item.meta.w, h = item.meta.h;
+        const grad = ctx.createLinearGradient(0, -h/2, 0, h/2);
+        grad.addColorStop(0, item.isOut ? '#ff7675' : '#dcdde1');
+        grad.addColorStop(0.5, item.isOut ? '#d63031' : '#7f8c8d');
+        grad.addColorStop(1, item.isOut ? '#900c3f' : '#2c3e50');
+        ctx.fillStyle = grad;
+        ctx.fillRect(-w/2, -h/2, w, h);
+        ctx.fillStyle = '#111';
+        ctx.fillRect(-w/2, -h/4, 4, h/2);
+        ctx.fillRect(w/2 - 4, -h/4, 4, h/2);
+    }
+
+    function drawCoil(ctx, item) {
+        const r = item.meta.r;
+        ctx.fillStyle = item.isOut ? '#d63031' : '#7f8c8d';
+        ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI*2); ctx.fill();
+        ctx.lineWidth = 4; ctx.strokeStyle = '#2c3e50'; ctx.stroke();
+        ctx.fillStyle = '#1e272e';
+        ctx.beginPath(); ctx.arc(0, 0, r/3, 0, Math.PI*2); ctx.fill();
+    }
+
+    function drawCylinder(ctx, item) {
+        const w = item.meta.w, h = item.meta.h;
+        ctx.fillStyle = item.isOut ? '#e74c3c' : '#27ae60';
+        ctx.beginPath();
+        ctx.roundRect(-w/2, -h/2, w, h, 8);
+        ctx.fill();
+        ctx.fillStyle = '#f1c40f';
+        ctx.fillRect(-6, -h/2 - 8, 12, 8);
+    }
+
+    function drawPallet(ctx, item) {
+        const w = item.meta.w, h = item.meta.h;
+        ctx.fillStyle = item.isOut ? '#e74c3c' : '#e67e22';
+        ctx.fillRect(-w/2, -h/2, w, h);
+        ctx.fillStyle = '#d35400';
+        ctx.fillRect(-w/2 + 8, h/2 - 12, 18, 12);
+        ctx.fillRect(-9, h/2 - 12, 18, 12);
+        ctx.fillRect(w/2 - 26, h/2 - 12, 18, 12);
+    }
+
+    // --- TAŞMA KONTROLÜ ---
+    function checkViolations() {
+        if (isGameOver) return;
+        let anyOut = false;
+
+        items.forEach(item => {
+            const px = item.position.x;
+            const py = item.position.y;
+            
+            const isLeftOut = px < SAFE_ZONE.x;
+            const isRightOut = px > SAFE_ZONE.x + SAFE_ZONE.w;
+            const isTopOut = py < SAFE_ZONE.y;
+            const isBottomOut = py > canvas.height + 30;
+
+            if (isLeftOut || isRightOut || isTopOut || isBottomOut) {
+                item.isOut = true;
+                anyOut = true;
+            } else {
+                item.isOut = false;
+            }
+        });
+
+        const wBox = document.getElementById('warning-box');
+        const wSec = document.getElementById('warn-sec');
+
+        if (anyOut) {
+            if (!violationStartTime) violationStartTime = Date.now();
+            let elapsed = (Date.now() - violationStartTime) / 1000;
+            let left = (3.0 - elapsed).toFixed(1);
+            
+            wBox.style.display = 'block';
+            wSec.innerText = left;
+
+            if (left <= 0) gameOver();
+        } else {
+            violationStartTime = null;
+            wBox.style.display = 'none';
+        }
+    }
+
+    function gameOver() {
+        isGameOver = true;
+        document.getElementById('final-score').innerText = score.toFixed(1);
+        document.getElementById('game-over-modal').style.visibility = 'visible';
+        Runner.stop(runner);
+    }
+
+    // Giriş Bağlantıları
+    const keys = {};
+    function setupInputs() {
+        const btns = ['btn-left', 'btn-right', 'btn-up', 'btn-down'];
+        btns.forEach(id => {
+            const el = document.getElementById(id);
+            el.addEventListener('touchstart', (e) => { e.preventDefault(); keys[id] = true; });
+            el.addEventListener('touchend', (e) => { e.preventDefault(); keys[id] = false; });
+            el.addEventListener('mousedown', () => keys[id] = true);
+            el.addEventListener('mouseup', () => keys[id] = false);
+            el.addEventListener('mouseleave', () => keys[id] = false);
+        });
+
+        const dropEl = document.getElementById('btn-drop');
+        dropEl.addEventListener('touchstart', (e) => { e.preventDefault(); dropItem(); });
+        dropEl.addEventListener('click', dropItem);
+
+        document.getElementById('btn-stop').addEventListener('click', pauseGame);
+    }
+
+    function startGame() {
+        document.getElementById('start-modal').style.visibility = 'hidden';
+        initPhysics();
+        setupInputs();
+        spawnItem();
+    }
+
+    function pauseGame() {
+        isPaused = true;
+        document.getElementById('pause-modal').style.visibility = 'visible';
+        runner.enabled = false;
+    }
+
+    function resumeGame() {
+        isPaused = false;
+        document.getElementById('pause-modal').style.visibility = 'hidden';
+        runner.enabled = true;
+    }
+
+    window.addEventListener('resize', () => {
+        if (render) {
+            render.options.width = window.innerWidth;
+            render.options.height = window.innerHeight * 0.5;
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight * 0.5;
+            SAFE_ZONE.w = window.innerWidth * 0.78;
+            SAFE_ZONE.x = (window.innerWidth - SAFE_ZONE.w) / 2 + 30;
+        }
+    });
+</script>
+</body>
+</html>
